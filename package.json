@@ -13,7 +13,7 @@
   "main": "lib",
   "dependencies": {
     "co": "*",
-    "fora-node-thunkify": "*"
+    "nodefunc-promisify": "*"
   },
   "devDependencies": {
     "mocha": "*",
