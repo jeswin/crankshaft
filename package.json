@@ -4,7 +4,7 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Build System.",
   "repository": {
     "type": "git",

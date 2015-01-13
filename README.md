@@ -41,8 +41,8 @@ buildConfig = function() {
     */
     this.onStart(function*() {
         console.log("Creating app directory");
-        yield* exec("rm app -rf");
-        yield* exec("mkdir app");
+        yield exec("rm app -rf");
+        yield exec("mkdir app");
     }, "create_dirs", ["start_build"]);
 
 
@@ -53,7 +53,7 @@ buildConfig = function() {
     ensureDirExists = function*(file) {
         var dir = path.dirname(file);
         if (!fs.existsSync(dir)) {
-            yield* exec("mkdir " + dir + " -p");
+            yield exec("mkdir " + dir + " -p");
         }
     }
 
@@ -64,8 +64,8 @@ buildConfig = function() {
     */
     this.watch(["*.txt", "*.html"], function*(filePath) {
         var dest = filePath.replace(/^src\//, 'app/');
-        yield* ensureDirExists(dest);
-        yield* exec("cp " + filePath + " " + dest);
+        yield ensureDirExists(dest);
+        yield exec("cp " + filePath + " " + dest);
         this.queue("merge_txt_files");
         this.queue("fake_server_restart");
     }, "copy_files");
@@ -75,7 +75,7 @@ buildConfig = function() {
         A job to merge txt files and create wisdom.data
     */
     this.job(function*() {
-        yield* exec("cat app/somefile.txt app/anotherfile.txt app/abc.html > app/wisdom.data");
+        yield exec("cat app/somefile.txt app/anotherfile.txt app/abc.html > app/wisdom.data");
     }, "merge_txt_files");
 
 
@@ -84,7 +84,7 @@ buildConfig = function() {
     */
     this.job(function*() {
         console.log("Restarting the fake server .... done");
-        //yield* exec("restart.sh"); //.. for example
+        //yield exec("restart.sh"); //.. for example
     }, "fake_server_restart");
 }
 
