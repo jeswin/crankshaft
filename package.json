@@ -4,7 +4,7 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Build System.",
   "repository": {
     "type": "git",
@@ -13,7 +13,8 @@
   "main": "lib",
   "dependencies": {
     "co": "*",
-    "nodefunc-generatorify": "*"
+    "nodefunc-generatorify": "*",
+    "co-parallel-tools": "*"
   },
   "devDependencies": {
     "mocha": "*",
