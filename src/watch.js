@@ -1,35 +1,46 @@
-(function () {
-    "use strict";
+import fs from 'fs';
+import path from 'path';
+import promisify from 'nodefunc-promisify';
+import Job from './job';
 
-    var fs = require('fs'),
-        path = require('path'),
-        generatorify = require('nodefunc-generatorify'),
-        readdir = generatorify(fs.readdir),
-        stat = generatorify(fs.stat),
-        coTools = require('co-parallel-tools');
+let readdir = promisify(fs.readdir);
+let stat = promisify(fs.stat);
 
 
-    var Job = require('./job');
+//Make sure dir ends with a trailing slash
+const ensureLeadingSlash = function(dir) {
+    return /^\//.test(dir) ? dir : "/" + dir;
+};
 
-    //Make sure dir ends with a trailing slash
-    var ensureLeadingSlash = function(dir) {
-        return /^\//.test(dir) ? dir : "/" + dir;
+
+//Make sure dir ends with a trailing slash
+const ensureTrailingSlash = function(dir) {
+    return /\/$/.test(dir) ? dir : dir + "/";
+};
+
+const resolveDirPath = function() {
+    const result = path.resolve.apply(path, arguments);
+    return ensureTrailingSlash(result);
+};
+
+/*
+    Conditions for exclusion are
+    1. pattern isn't important AND
+    2. excludedPattern tests resolvedPath AND
+    3. excludedPattern.dir isn't set OR excludedPattern.dir is set but is longer than pattern.dir
+*/
+const getExcludeDirectoryPredicate = function(dir, root, pattern) {
+    const resolvedPath = resolveDirPath(root, dir);
+    return function(excludedPattern) {
+        return !pattern.important && excludedPattern.regex.test(resolvedPath) && (!excludedPattern.dir || (excludedPattern.dir.length >= pattern.dir.length));
     };
-
-    //Make sure dir ends with a trailing slash
-    var ensureTrailingSlash = function(dir) {
-        return /\/$/.test(dir) ? dir : dir + "/";
-    };
+};
 
 
-    var resolveDirPath = function() {
-        var result = path.resolve.apply(path, arguments);
-        return ensureTrailingSlash(result);
-    };
+class Watch extends Job {
 
-
-    var Watch = function(patterns, fn, name, deps, config, options) {
-        Job.call(this, fn, name, deps, config, options);
+    constructor(patterns, fn, name, deps, config, options) {
+        super(fn, name, deps, config, options);
 
         this.patterns = [];
         this.excludedPatterns = [];
@@ -43,7 +54,7 @@
 
         patterns.forEach(function(pattern) {
             if (typeof pattern === "string") {
-                var result = {};
+                const result = {};
                 /*
                     Exclamation mark at he beginning is a special character.
                     1. "!!!hello" includes a file or directory named "!hello"
@@ -51,7 +62,7 @@
                     3. "!*.txt" means the watch should exclude all txt files.
                 */
                 if (/^!!!/.test(pattern)) {
-                    path = pattern.substr(2);
+                    pattern = pattern.substr(2);
                     result.file = path.basename(pattern);
                     result.dir = path.dirname(pattern);
                 } else if (/^!!/.test(pattern)) {
@@ -102,7 +113,7 @@
                         break;
                     case "file":
                         if (!pattern.regex) {
-                            var excludeBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
+                            const excludeBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
                             pattern.regex = new RegExp(excludeBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
                         }
                         this.excludedPatterns.push(pattern);
@@ -112,7 +123,7 @@
                 }
             } else {
                 if (!pattern.regex) {
-                    var patternBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
+                    const patternBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
                     pattern.regex = new RegExp(patternBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
                 }
                 if (typeof pattern.recurse === "undefined" || pattern.recurse === null) {
@@ -122,41 +133,25 @@
             }
 
         }, this);
-    };
-
-    Watch.prototype = Object.create(Job.prototype);
-    Watch.prototype.constructor = Watch;
+    }
 
 
-    /*
-        Conditions for exclusion are
-        1. pattern isn't important AND
-        2. excludedPattern tests resolvedPath AND
-        3. excludedPattern.dir isn't set OR excludedPattern.dir is set but is longer than pattern.dir
-    */
-    var getExcludeDirectoryPredicate = function(dir, root, pattern) {
-        var resolvedPath = resolveDirPath(root, dir);
-        return function(excludedPattern) {
-            return !pattern.important && excludedPattern.regex.test(resolvedPath) && (!excludedPattern.dir || (excludedPattern.dir.length >= pattern.dir.length));
-        };
-    };
+    async getTasks() {
+        const self = this;
 
-    Watch.prototype.getTasks = function*() {
-        var self = this;
+        const directoryCache = {};
 
-        var directoryCache = {};
+        const walk = async function(dir, recurse, pattern, excludedDirs) {
+            let results = [{ path: dir, type: 'dir' }];
 
-        var walk = function*(dir, recurse, pattern, excludedDirs) {
-            var results = [{ path: dir, type: 'dir' }];
-
-            var dirEntries;
+            let dirEntries;
             if (!directoryCache[dir]) {
                 dirEntries = [];
                 try {
-                    var _paths = yield* readdir(dir);
-                    for (var i = 0; i < _paths.length; i++) {
-                        var _rootRelativePath = path.join(dir, _paths[i]);
-                        var _info = yield* stat(_rootRelativePath);
+                    const _paths = await readdir(dir);
+                    for (let i = 0; i < _paths.length; i++) {
+                        const _rootRelativePath = path.join(dir, _paths[i]);
+                        const _info = await stat(_rootRelativePath);
                         dirEntries.push({ path: _paths[i], info: _info, rootRelativePath: _rootRelativePath });
                     }
                     directoryCache[dir] = dirEntries;
@@ -168,14 +163,14 @@
                 dirEntries = directoryCache[dir];
             }
 
-            for (var j = 0; j < dirEntries.length; j++) {
-                var entry = dirEntries[j];
+            for (let j = 0; j < dirEntries.length; j++) {
+                const entry = dirEntries[j];
                 if (entry.info.isDirectory()) {
-                    var dirExcludePredicate = getExcludeDirectoryPredicate(entry.rootRelativePath, self.config.root, pattern);
+                    const dirExcludePredicate = getExcludeDirectoryPredicate(entry.rootRelativePath, self.config.root, pattern);
                     if (!excludedDirs.some(dirExcludePredicate)) {
                         results.push({ path: entry.rootRelativePath, type: 'dir' });
                         if (recurse) {
-                            results = results.concat(yield* walk(entry.rootRelativePath, recurse, pattern, excludedDirs));
+                            results = results.concat(await walk(entry.rootRelativePath, recurse, pattern, excludedDirs));
                         }
                     }
                 } else {
@@ -192,12 +187,12 @@
             Walk directories with caching.
             If a directory has already been walked, the same results are returned.
         */
-        var walkedDirectories = [];
-        var getDirWalker = function(pattern) {
-            var alreadyWalked = walkedDirectories.filter(function(d) { return d.dir === pattern.dir && d.recurse === pattern.recurse && d.important === pattern.important; });
+        const walkedDirectories = [];
+        const getDirWalker = function(pattern) {
+            const alreadyWalked = walkedDirectories.filter(function(d) { return d.dir === pattern.dir && d.recurse === pattern.recurse && d.important === pattern.important; });
             if (alreadyWalked.length) {
-                return function*() {
-                    var cachedWalkResult = {};
+                return async function() {
+                    const cachedWalkResult = {};
                     cachedWalkResult.dir = pattern.dir;
                     cachedWalkResult.recurse = pattern.recurse;
                     cachedWalkResult.important = pattern.important;
@@ -206,16 +201,16 @@
                     return cachedWalkResult;
                 };
             } else {
-                var walkResult = {
+                const walkResult = {
                     dir: pattern.dir,
                     recurse: pattern.recurse,
                     important: pattern.important,
                     pattern: pattern
                 };
                 walkedDirectories.push(walkResult);
-                return function*() {
+                return async function() {
                     walkResult.entries = {};
-                    walkResult.entries.paths = yield* walk(pattern.dir, pattern.recurse, pattern, self.excludedDirectories);
+                    walkResult.entries.paths = await walk(pattern.dir, pattern.recurse, pattern, self.excludedDirectories);
                     return walkResult;
                 };
             }
@@ -224,8 +219,8 @@
         /*
             If the pattern directory is not excluded, create a dirWalker
         */
-        var dirWalkers = this.patterns.map(function(pattern) {
-            var predicate = getExcludeDirectoryPredicate(pattern.dir, self.config.root, pattern);
+        const dirWalkers = this.patterns.map(function(pattern) {
+            const predicate = getExcludeDirectoryPredicate(pattern.dir, self.config.root, pattern);
             return !self.excludedDirectories.some(predicate) ? getDirWalker(pattern) : null;
         }).filter(function(pattern) { return typeof pattern !== "undefined" && pattern !== null; });
 
@@ -233,13 +228,13 @@
         /*
             Run directory walking in parallel.
         */
-        var pathsInPatternRoots = yield* coTools.parallel(dirWalkers);
+        const pathsInPatternRoots = await Promise.all(dirWalkers.map(f => f()));
 
 
         /*
             From the results, we need to create a list of files and directories that need to be watched.
         */
-        var addWatchedDir = function(entry) {
+        const addWatchedDir = function(entry) {
             self.watchedDirs.push({
                 path: entry.path,
                 type: entry.type
@@ -251,8 +246,8 @@
             1. Check if the file path matches pattern AND
             2. If it is either marked important OR (does not test with excludedPatterns or does so with less specificity)
         */
-        var addWatchedFile = function(entry, pattern) {
-            var resolvedPath = path.resolve(self.config.root, entry.path);
+        const addWatchedFile = function(entry, pattern) {
+            const resolvedPath = path.resolve(self.config.root, entry.path);
             if (
                 pattern.regex.test(resolvedPath) &&
                 (
@@ -263,7 +258,7 @@
                     })
                 )
             ) {
-                var existing = self.watchedFiles.filter(function(e) { return e.path === entry.path; });
+                const existing = self.watchedFiles.filter(function(e) { return e.path === entry.path; });
                 if (existing.length) {
                     existing[0].patterns.push(pattern);
                 } else {
@@ -288,17 +283,17 @@
 
 
         return self.watchedFiles.map(function(entry) {
-            return function*() {
-                yield* coTools.doYield(self.fn, self.config, [entry.path, "change", entry.patterns]);
+            return async function() {
+                await self.fn(entry.path, "change", entry.patterns);
             };
         });
     };
 
-    Watch.prototype.startMonitoring = function(_onFileChange) {
-        var self = this;
+    startMonitoring(_onFileChange) {
+        const self = this;
 
         //Fire fileChange if path conditions are met.
-        var onFileChange = function(ev, watch, self) {
+        const onFileChange = function(ev, watch, self) {
             _onFileChange(ev, watch, self, self.config);
         };
 
@@ -306,7 +301,7 @@
             Create watches for the file list we have previously identified
         */
         this.watchedFiles.forEach(function(watch) {
-            var fileWatcher = fs.watch(watch.path, function(ev, filename) {
+            const fileWatcher = fs.watch(watch.path, function(ev, filename) {
                 onFileChange(ev, watch, self);
             });
             watch.fileWatcher = fileWatcher;
@@ -318,14 +313,14 @@
         */
         this.watchedDirs.forEach(function(watch) {
             fs.watch(watch.path, function(ev, filename) {
-                var filePath = path.join(watch.path, filename);
-                var resolvedPath = path.resolve(self.config.root, filePath);
+                const filePath = path.join(watch.path, filename);
+                const resolvedPath = path.resolve(self.config.root, filePath);
 
                 //If there is an existing fileWatcher, the file is already being watched.
                 if (self.watchIndex[resolvedPath]) {
                     onFileChange(ev, self.watchIndex[resolvedPath], self);
                 } else {
-                    var matchingPatterns = self.patterns.filter(function(pattern) {
+                    const matchingPatterns = self.patterns.filter(function(pattern) {
                         return pattern.regex.test(resolvedPath) &&
                         (
                             pattern.important ||
@@ -337,7 +332,7 @@
                     });
 
                     if (matchingPatterns.length) {
-                        var fileWatcher = fs.watch(match.path, function(ev, filename) {
+                        const fileWatcher = fs.watch(match.path, function(ev, filename) {
                             onFileChange(ev, watch, self);
                         });
                         self.watchIndex[filePath] = {
@@ -351,6 +346,6 @@
             });
         });
     };
+}
 
-    module.exports = Watch;
-}());
+export default Watch;

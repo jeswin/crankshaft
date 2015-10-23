@@ -51,7 +51,7 @@ buildConfig = function() {
         We are going to use this in tasks below.
     */
     ensureDirExists = function*(file) {
-        var dir = path.dirname(file);
+        const dir = path.dirname(file);
         if (!fs.existsSync(dir)) {
             yield exec("mkdir " + dir + " -p");
         }
@@ -63,7 +63,7 @@ buildConfig = function() {
         Write as many this.watch() methods as you want, in this example we use only one.
     */
     this.watch(["*.txt", "*.html"], function*(filePath) {
-        var dest = filePath.replace(/^src\//, 'app/');
+        const dest = filePath.replace(/^src\//, 'app/');
         yield ensureDirExists(dest);
         yield exec("cp " + filePath + " " + dest);
         this.queue("merge_txt_files");
