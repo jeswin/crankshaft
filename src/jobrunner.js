@@ -21,14 +21,14 @@ class JobRunner {
         const jobList = [];
 
         if (this.isRunning)
-            throw new Error("Cannot call JobRunner.run while it is already in running state");
+            throw new Error("Cannot call JobRunner.run() while it is already in running state");
 
         this.isRunning = true;
 
         // Checks if all dependent jobs have completed.
-        const isSignaled = function(jobData) {
-            //Already done?
-            if (jobData.tasks && jobData.tasks.length === 0)
+        const canSignal = function(jobData) {
+            //Already done or is it in the process of starting?
+            if ((jobData.tasks && jobData.tasks.length === 0) || jobData.isStarting)
                 return false;
 
             //Not done yet.
@@ -51,28 +51,28 @@ class JobRunner {
         // The scheduler will schedule as many threads as needed to match self.options.threads
         // generatorRecursionCount is used to set a max limit on how many times generators recurse.
         const scheduler = function(generatorRecursionCount) {
-            const asyncFunctions = [];
+            const pseudoThreads = [];
             let threadCtr = self.options.threads - activeThreads;
             activeThreads += threadCtr;
             if (threadCtr > 0) {
                 generatorRecursionCount += threadCtr;
                 while (threadCtr--) {
-                    asyncFunctions.push(async function() {
+                    pseudoThreads.push(async function() {
                         await next(generatorRecursionCount);
                     });
                 }
             }
-            return asyncFunctions;
+            return pseudoThreads;
         };
 
         // This is where actual work happens.
         const next = async function(generatorRecursionCount) {
             // Signal all jobs that can run
             let fn, jobData;
-            let signaled = jobList.filter(isSignaled);
+            let signaled = jobList.filter(canSignal);
 
             for(let i = 0; i < signaled.length; i++) {
-                if (typeof(signaled[i].tasks) === "undefined" && !signaled[i].isStarting) {
+                if (typeof(signaled[i].tasks) === "undefined") {
                     signaled[i].isStarting = true;
                     signaled[i].tasks = await signaled[i].job.getTasks();
                     signaled[i].totalTasks = signaled[i].tasks.length;
@@ -91,15 +91,14 @@ class JobRunner {
             if (fn) {
                 await fn();
                 jobData.completedTasks++;
-                activeThreads--;
 
                 if (generatorRecursionCount < 400) {
-                    const asyncFunctions = scheduler(generatorRecursionCount);
-                    await Promises.all(asyncFunctions.map(f => f()));
+                    const pseudoThreads = scheduler(generatorRecursionCount);
+                    let promises = pseudoThreads.map(f => f());
+                    await Promise.all(promises);
                 }
-            } else {
-                activeThreads--;
             }
+            activeThreads--;
         };
 
         const addToJobList = function(job, jobList) {
@@ -138,10 +137,11 @@ class JobRunner {
 
 
         //We need to run things in parallel.
-        let signaled = jobList.filter(isSignaled);
-        while ((signaled = jobList.filter(isSignaled)).length > 0) {
-            const asyncFunctions = scheduler(0);
-            await Promise.all(asyncFunctions.map(f => f()));
+        let signaled = jobList.filter(canSignal);
+        while ((signaled = jobList.filter(canSignal)).length > 0) {
+            const pseudoThreads = scheduler(0);
+            let promises = pseudoThreads.map(f => f());
+            await Promise.all(promises);
         }
 
         this.isRunning = false;

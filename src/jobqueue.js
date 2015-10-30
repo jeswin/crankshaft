@@ -19,56 +19,56 @@ class JobQueue {
 
 
     job(fn, name, deps) {
-        const job = new Job(fn, name, deps, this, {});
+        const job = new Job(fn, name, deps, this);
         this.jobs.push(job);
         return job;
     }
 
 
     onStart(fn, name, deps) {
-        const job = new Job(fn, name, deps, this, {});
+        const job = new Job(fn, name, deps, this);
         this.onStartJobs.push(job);
         return job;
     }
 
 
     onComplete(fn, name, deps) {
-        const job = new Job(fn, name, deps, this, {});
+        const job = new Job(fn, name, deps, this);
         this.onCompleteJobs.push(job);
         return job;
     }
 
 
-    dequeue(fn) {
-        this.queuedJobs = this.queuedJobs.filter(function(f) {
-            return f.fn !== fn;
-        });
+    dequeue(name) {
+        this.queuedJobs = this.queuedJobs.filter(j => j.name !== name);
     }
 
 
-    queue(fn, allowDuplicates) {
-        if (!allowDuplicates) {
-            this.queuedJobs = this.queuedJobs.filter(function(f) {
-                return f.fn !== fn;
-            });
+    queue(name, allowDuplicates) {
+        if (allowDuplicates !== false || !this.queuedJobs.some(j => j.name === name)) {
+            const matchingJob = this.jobs.filter(j => j.name === name);
+            if (!matchingJob.length) {
+                throw new Error(`Job ${name} was not found.`);
+            }
+            const job = matchingJob[0];
+            this.queuedJobs.push(job);
+            return job;
         }
-        this.queuedJobs.push({ fn: fn });
     }
+
 
     async run(name) {
-        let job;
         const jobs = this.jobs.filter(function(t) {
-            return t.name === fn;
+            return t.name === name;
         });
         if (jobs.length) {
-            job = jobs[0];
+            const job = jobs[0];
+            const runner = new JobRunner(this, { threads: this.build.options.threads });
+            await runner.run(job);
         } else {
             throw new Error("The job " + fn + " was not found");
         }
-
-        const runner = new JobRunner(this, { threads: this.build.options.threads });
-        await runner.run(job);
-    };
+    }
 
 
     async runQueuedJobs() {
@@ -77,7 +77,7 @@ class JobQueue {
             const runner = new JobRunner(this, { threads: this.build.options.threads });
             await runner.run(job);
         }
-    };
+    }
 
 
     async runJobs() {
@@ -99,7 +99,7 @@ class JobQueue {
         await this.runQueuedJobs();
 
         process.chdir(this.build.root);
-    };
+    }
 }
 
-export default Job;
+export default JobQueue;

@@ -3,8 +3,8 @@ import path from 'path';
 import promisify from 'nodefunc-promisify';
 import Job from './job';
 
-let readdir = promisify(fs.readdir);
-let stat = promisify(fs.stat);
+let readdir = promisify(fs.readdir.bind(fs));
+let stat = promisify(fs.stat.bind(fs));
 
 
 //Make sure dir ends with a trailing slash
@@ -39,8 +39,8 @@ const getExcludeDirectoryPredicate = function(dir, root, pattern) {
 
 class Watch extends Job {
 
-    constructor(patterns, fn, name, deps, config, options) {
-        super(fn, name, deps, config, options);
+    constructor(patterns, fn, name, deps, parent, options) {
+        super(fn, name, deps, parent, options);
 
         this.patterns = [];
         this.excludedPatterns = [];
@@ -106,14 +106,14 @@ class Watch extends Job {
                             }
                         } else {
                             if (!pattern.regex) {
-                                pattern.regex = new RegExp("^" + resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/"));
+                                pattern.regex = new RegExp("^" + resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/"));
                             }
                         }
                         this.excludedDirectories.push(pattern);
                         break;
                     case "file":
                         if (!pattern.regex) {
-                            const excludeBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
+                            const excludeBaseDir = resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/");
                             pattern.regex = new RegExp(excludeBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
                         }
                         this.excludedPatterns.push(pattern);
@@ -123,7 +123,7 @@ class Watch extends Job {
                 }
             } else {
                 if (!pattern.regex) {
-                    const patternBaseDir = resolveDirPath(config.root, pattern.dir).replace(/\//g, "\\/");
+                    const patternBaseDir = resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/");
                     pattern.regex = new RegExp(patternBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
                 }
                 if (typeof pattern.recurse === "undefined" || pattern.recurse === null) {
@@ -157,7 +157,9 @@ class Watch extends Job {
                     directoryCache[dir] = dirEntries;
                 }
                 catch(ex) {
-                    console.log("Skipped reading " + dir + ": " + ex.toString());
+                    if (self.parent.build.options.suppressErrors === false) {
+                        throw ex;
+                    }
                 }
             } else {
                 dirEntries = directoryCache[dir];
@@ -166,7 +168,7 @@ class Watch extends Job {
             for (let j = 0; j < dirEntries.length; j++) {
                 const entry = dirEntries[j];
                 if (entry.info.isDirectory()) {
-                    const dirExcludePredicate = getExcludeDirectoryPredicate(entry.rootRelativePath, self.config.root, pattern);
+                    const dirExcludePredicate = getExcludeDirectoryPredicate(entry.rootRelativePath, self.parent.root, pattern);
                     if (!excludedDirs.some(dirExcludePredicate)) {
                         results.push({ path: entry.rootRelativePath, type: 'dir' });
                         if (recurse) {
@@ -220,7 +222,7 @@ class Watch extends Job {
             If the pattern directory is not excluded, create a dirWalker
         */
         const dirWalkers = this.patterns.map(function(pattern) {
-            const predicate = getExcludeDirectoryPredicate(pattern.dir, self.config.root, pattern);
+            const predicate = getExcludeDirectoryPredicate(pattern.dir, self.parent.root, pattern);
             return !self.excludedDirectories.some(predicate) ? getDirWalker(pattern) : null;
         }).filter(function(pattern) { return typeof pattern !== "undefined" && pattern !== null; });
 
@@ -229,7 +231,6 @@ class Watch extends Job {
             Run directory walking in parallel.
         */
         const pathsInPatternRoots = await Promise.all(dirWalkers.map(f => f()));
-
 
         /*
             From the results, we need to create a list of files and directories that need to be watched.
@@ -247,7 +248,7 @@ class Watch extends Job {
             2. If it is either marked important OR (does not test with excludedPatterns or does so with less specificity)
         */
         const addWatchedFile = function(entry, pattern) {
-            const resolvedPath = path.resolve(self.config.root, entry.path);
+            const resolvedPath = path.resolve(self.parent.root, entry.path);
             if (
                 pattern.regex.test(resolvedPath) &&
                 (
@@ -294,7 +295,7 @@ class Watch extends Job {
 
         //Fire fileChange if path conditions are met.
         const onFileChange = function(ev, watch, self) {
-            _onFileChange(ev, watch, self, self.config);
+            _onFileChange(ev, watch, self, self.parent);
         };
 
         /*
@@ -314,7 +315,7 @@ class Watch extends Job {
         this.watchedDirs.forEach(function(watch) {
             fs.watch(watch.path, function(ev, filename) {
                 const filePath = path.join(watch.path, filename);
-                const resolvedPath = path.resolve(self.config.root, filePath);
+                const resolvedPath = path.resolve(self.parent.root, filePath);
 
                 //If there is an existing fileWatcher, the file is already being watched.
                 if (self.watchIndex[resolvedPath]) {
