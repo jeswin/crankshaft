@@ -7,6 +7,7 @@ import path from 'path';
 import childProcess from 'child_process';
 import should from 'should';
 import crankshaft from "..";
+import touch from "touch";
 
 const spawn = childProcess.spawn;
 
@@ -86,7 +87,7 @@ describe("Crankshaft build", () => {
         const config = build.configure(createConfig, 'fixtures');
         return crankshaft.run(build, false).then(() => {
             matchingFiles.should.containEql("src/anotherfile.txt");
-            matchingFiles.length.should.equal(4);
+            matchingFiles.length.should.equal(5);
         });
     });
 
@@ -146,5 +147,33 @@ describe("Crankshaft build", () => {
         return crankshaft.run(build, false).then(() => {
             restarted.should.be.false();
         });
+    });
+
+
+    /*
+        We're gonna touch a file after 1000ms and see if we receive the callback
+    */
+    it("Must watch a file for changes (happens after 1000ms)", (done) => {
+        let isWatching = false;
+        let watchedFile;
+        const matchingFiles = [];
+        const build = crankshaft.create({ threads: 4 });
+        build.onComplete(() => {
+            setTimeout(() => {
+                watchedFile = matchingFiles[0];
+                isWatching = true;
+                touch(`fixtures/${watchedFile}`);
+            }, 500);
+        });
+        const createConfig = function() {
+            this.watch(["*.txt", "*.html"], async function(filePath) {
+                if (isWatching && watchedFile === filePath) {
+                    done();
+                }
+                matchingFiles.push(filePath);
+            }, "copy_files");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, true);
     });
 });

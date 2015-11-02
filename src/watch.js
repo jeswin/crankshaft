@@ -302,6 +302,7 @@ class Watch extends Job {
             Create watches for the file list we have previously identified
         */
         this.watchedFiles.forEach(function(watch) {
+            const resolvedPath = path.resolve(self.parent.root, watch.path);
             const fileWatcher = fs.watch(watch.path, function(ev, filename) {
                 onFileChange(ev, watch, self);
             });
@@ -310,17 +311,17 @@ class Watch extends Job {
         });
 
         /*
-            Create watches for the directory list we have previously identified
+            Create watches for the directories we have previously identified
         */
         this.watchedDirs.forEach(function(watch) {
             fs.watch(watch.path, function(ev, filename) {
                 const filePath = path.join(watch.path, filename);
-                const resolvedPath = path.resolve(self.parent.root, filePath);
 
                 //If there is an existing fileWatcher, the file is already being watched.
-                if (self.watchIndex[resolvedPath]) {
-                    onFileChange(ev, self.watchIndex[resolvedPath], self);
+                if (self.watchIndex[filePath]) {
+                    onFileChange(ev, self.watchIndex[filePath], self);
                 } else {
+                    const resolvedPath = path.resolve(self.parent.root, filePath);
                     const matchingPatterns = self.patterns.filter(function(pattern) {
                         return pattern.regex.test(resolvedPath) &&
                         (
@@ -333,7 +334,7 @@ class Watch extends Job {
                     });
 
                     if (matchingPatterns.length) {
-                        const fileWatcher = fs.watch(match.path, function(ev, filename) {
+                        const fileWatcher = fs.watch(filePath, function(ev, filename) {
                             onFileChange(ev, watch, self);
                         });
                         self.watchIndex[filePath] = {

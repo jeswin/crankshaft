@@ -4,6 +4,12 @@ import Job from './job';
 import Configuration from './configuration';
 import JobQueue from './jobqueue';
 
+
+let sleep = function(ms) {
+    return new Promise(r => setTimeout(r, ms));
+};
+
+
 class Build extends JobQueue {
 
     constructor(options) {
@@ -48,11 +54,6 @@ class Build extends JobQueue {
 
         if (monitor)
             await this.startMonitoring();
-    };
-
-
-    sleep(ms) {
-        return new Promise(r => setTimeout(r, ms));
     }
 
 
@@ -63,8 +64,9 @@ class Build extends JobQueue {
         this.monitoring = true;
 
         const onFileChange = function(ev, watch, job, config) {
-            if (!fileChangeEvents.concat(processedCycle).some(function(c) { return c.watch.path === watch.path && c.config === config; }))
+            if (!fileChangeEvents.concat(processedCycle).some(function(c) { return c.watch.path === watch.path && c.config === config; })) {
                 fileChangeEvents.push({ ev: ev, watch: watch, job: job, config: config });
+            }
         };
 
         this.configs.forEach(function(config) {
@@ -78,13 +80,11 @@ class Build extends JobQueue {
 
             while(fileChangeEvents.length) {
                 const changeNotification = fileChangeEvents[0];
-
                 process.chdir(changeNotification.config.root);
 
                 //The exists check is to handle the temp files that many editors create.
                 //They disappear instantaneously, and fs.watch will except.
                 if (fs.existsSync(changeNotification.watch.path)) {
-
                     //If there is an existing file watcher, kill (and later recreate) watching that file.
                     //So that it won't get into a loop if fn changes the same file
                     if (changeNotification.watch.fileWatcher)
@@ -92,7 +92,6 @@ class Build extends JobQueue {
 
                     //Push this to the list of files we won't monitor in this cycle.
                     processedCycle.push({ watch: changeNotification.watch, config: changeNotification.config });
-
                     await changeNotification.job.fn(changeNotification.watch.path, "change", changeNotification.watch.patterns);
 
                     //Remove the event. We have processed it.
@@ -120,7 +119,7 @@ class Build extends JobQueue {
             if (this.queuedJobs.length)
                 await this.runQueuedJobs();
 
-            await sleep(1000);
+            await sleep(500);
         }
     }
 }

@@ -19,7 +19,8 @@
     "babel-runtime": "^5.8.29",
     "bluebird": "^3.0.2",
     "mocha": "*",
-    "should": "*"
+    "should": "*",
+    "touch": "*"
   },
   "engines": {
     "node": ">= 0.11.9"
