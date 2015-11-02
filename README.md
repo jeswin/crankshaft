@@ -1,95 +1,166 @@
-# crankshaft
+# Crankshaft
 
-crankshaft is a very simple build module for node.js (using ES6 generators). It prefers code over configuration and
+Crankshaft is a very simple build module for node.js built with ES7 async/await. It prefers code over configuration and
 encourages you to use stuff you already know like bash commands and built-in node functions. Also monitors files for
 changes after the build.
 
-Why the weird name? Because it is being developed as part of the Fora Project (http://github.com/jeswin/fora).
-
 ## HOWTO
-
-There are essentially three steps
 
 1. npm install 'crankshaft'
 2. Write a build.js file
-3. node --harmony build.js
+3. node build.js
 
 ### The build.js file
 
-This example should help you get started. This is the same code that runs in the test/ directory.
+These examples should help you get started. This is the same code that runs in the test/ directory.
 
 ```javascript
-/*
-    Configuration Section.
-*/
-buildConfig = function() {
-    /*
-        The first task to run when the build starts.
-        Let's call it "start_build". It just prints a message.
+describe("Crankshaft build", () => {
 
-        Note: name (ie "start_build") isn't stricly required,
-        but it allows us to declare it as a dependency in another job.
-    */
-    this.onStart(function*() {
-        console.log("Let's start copying files...");
-    }, "start_build");
-
-
-    /*
-        Let's create an app directory.
-        We add "start_build" as a dependency, so that it runs after the message.
-    */
-    this.onStart(function*() {
-        console.log("Creating app directory");
-        yield exec("rm app -rf");
-        yield exec("mkdir app");
-    }, "create_dirs", ["start_build"]);
-
-
-    /*
-        A helper function to create directories which may not exist.
-        We are going to use this in tasks below.
-    */
-    ensureDirExists = function*(file) {
-        const dir = path.dirname(file);
-        if (!fs.existsSync(dir)) {
-            yield exec("mkdir " + dir + " -p");
+    it("Must add function to the configuration's startup jobs", () => {
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.onStart(async function() {
+            }, "start_build");
         }
-    }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            config.onStartJobs.length.should.equal(1);
+            config.onStartJobs[0].name.should.equal('start_build');
+        });
+    });
+
+
+    it("Must add function to the configuration's completion jobs", () => {
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.onComplete(async function() {
+            }, "complete_build");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            config.onCompleteJobs.length.should.equal(1);
+            config.onCompleteJobs[0].name.should.equal('complete_build');
+        });
+    });
+
+
+    it("Must add task create_dirs depedent on start_build", () => {
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.onStart(async function() {
+            }, "start_build");
+            this.onStart(async function() {
+            }, "create_dirs", ["start_build"]);
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            config.onStartJobs.length.should.equal(2);
+            config.onStartJobs[1].name.should.equal('create_dirs');
+        });
+    });
+
+
+    it("Must return filenames matching specified patterns", () => {
+        const matchingFiles = [];
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.watch(["*.txt", "*.html"], async function(filePath) {
+                matchingFiles.push(filePath);
+            }, "copy_files");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            matchingFiles.should.containEql("src/anotherfile.txt");
+            matchingFiles.length.should.equal(5);
+        });
+    });
+
+
+    it("Must run a job", () => {
+        let restarted = false;
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            var self = this;
+            this.job(async function() {
+                restarted = true;
+            }, "fake_server_restart");
+            this.onComplete(async function() {
+                await self.run("fake_server_restart");
+            }, "complete_build");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            restarted.should.be.true();
+        });
+    });
+
+
+    it("Must run queued jobs", () => {
+        let restarted = false;
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            var self = this;
+            this.job(async function() {
+                restarted = true;
+            }, "fake_server_restart");
+            this.onComplete(async function() {
+                self.queue("fake_server_restart");
+            }, "complete_build");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            restarted.should.be.true();
+        });
+    });
+
+
+    it("Must dequeue specified job", () => {
+        let restarted = false;
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            var self = this;
+            this.job(async function() {
+                restarted = true;
+            }, "fake_server_restart");
+            this.onComplete(async function() {
+                self.queue("fake_server_restart");
+                self.dequeue("fake_server_restart");
+            }, "complete_build");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, false).then(() => {
+            restarted.should.be.false();
+        });
+    });
 
 
     /*
-        Copies all text and html files into the app directory.
-        Write as many this.watch() methods as you want, in this example we use only one.
+        We're gonna touch a file after 1000ms and see if we receive the callback
     */
-    this.watch(["*.txt", "*.html"], function*(filePath) {
-        const dest = filePath.replace(/^src\//, 'app/');
-        yield ensureDirExists(dest);
-        yield exec("cp " + filePath + " " + dest);
-        this.queue("merge_txt_files");
-        this.queue("fake_server_restart");
-    }, "copy_files");
-
-
-    /*
-        A job to merge txt files and create wisdom.data
-    */
-    this.job(function*() {
-        yield exec("cat app/somefile.txt app/anotherfile.txt app/abc.html > app/wisdom.data");
-    }, "merge_txt_files");
-
-
-    /*
-        A fake server restart. Just says it did it.
-    */
-    this.job(function*() {
-        console.log("Restarting the fake server .... done");
-        //yield exec("restart.sh"); //.. for example
-    }, "fake_server_restart");
-}
-
-build = require('crankshaft').create({ threads: 4 }); //That's right. Things get done in parallel.
-build.configure(buildConfig, 'data'); //data is the directory where your files are.
-build.start(true, function() { console.log("Build is done. But we're still monitoring."); }); //build.start(monitor files?, onComplete callback)
+    it("Must watch a file for changes (happens after 1000ms)", (done) => {
+        let isWatching = false;
+        let watchedFile;
+        const matchingFiles = [];
+        const build = crankshaft.create({ threads: 4 });
+        build.onComplete(() => {
+            setTimeout(() => {
+                watchedFile = matchingFiles[0];
+                isWatching = true;
+                touch(`fixtures/${watchedFile}`);
+            }, 500);
+        });
+        const createConfig = function() {
+            this.watch(["*.txt", "*.html"], async function(filePath) {
+                if (isWatching && watchedFile === filePath) {
+                    done();
+                }
+                matchingFiles.push(filePath);
+            }, "copy_files");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        return crankshaft.run(build, true);
+    });
+});
 
 ```

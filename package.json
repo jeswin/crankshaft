@@ -4,7 +4,7 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "description": "Build System.",
   "repository": {
     "type": "git",
@@ -15,19 +15,14 @@
     "nodefunc-promisify": "*"
   },
   "devDependencies": {
-    "asynctrace": "^1.5.0",
-    "babel-runtime": "^5.8.29",
-    "bluebird": "^3.0.2",
+    "babel-runtime": "*",
     "mocha": "*",
     "should": "*",
     "touch": "*"
-  },
-  "engines": {
-    "node": ">= 0.11.9"
   },
   "keywords": [
     "build",
     "tasks"
   ],
-  "license": "GPL-3.0+"
+  "license": "MIT"
 }
