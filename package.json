@@ -4,7 +4,7 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "Build System.",
   "repository": {
     "type": "git",
@@ -18,7 +18,8 @@
   "devDependencies": {
     "mocha": "*",
     "should": "*",
-    "touch": "*"
+    "touch": "*",
+    "fs-extra": "*"
   },
   "keywords": [
     "build",

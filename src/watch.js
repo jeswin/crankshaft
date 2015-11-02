@@ -248,7 +248,7 @@ class Watch extends Job {
             2. If it is either marked important OR (does not test with excludedPatterns or does so with less specificity)
         */
         const addWatchedFile = function(entry, pattern) {
-            const resolvedPath = path.resolve(self.parent.root, entry.path);
+            const resolvedPath = path.resolve(entry.path);
             if (
                 pattern.regex.test(resolvedPath) &&
                 (

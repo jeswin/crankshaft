@@ -2,12 +2,12 @@
     Some external libs and functions we'll use in our build script
 */
 import promisify from 'nodefunc-promisify';
-import fs from 'fs';
 import path from 'path';
 import childProcess from 'child_process';
 import should from 'should';
 import crankshaft from "..";
 import touch from "touch";
+import fs from "fs-extra";
 
 const spawn = childProcess.spawn;
 
@@ -31,6 +31,12 @@ const ensureDirExists = async function(file) {
 
 
 describe("Crankshaft build", () => {
+
+    //Delete the test-fixtures directory.
+    before(() => {
+        fs.removeSync(`${__dirname}/fixtures/temp`);
+        fs.mkdirsSync(`${__dirname}/fixtures/temp`);
+    });
 
     it("Must add function to the configuration's startup jobs", () => {
         const build = crankshaft.create({ threads: 4 });
@@ -76,7 +82,7 @@ describe("Crankshaft build", () => {
     });
 
 
-    it("Must return filenames matching specified patterns", () => {
+    it("Must return filenames matching patterns", () => {
         const matchingFiles = [];
         const build = crankshaft.create({ threads: 4 });
         const createConfig = function() {
@@ -87,7 +93,39 @@ describe("Crankshaft build", () => {
         const config = build.configure(createConfig, 'fixtures');
         return crankshaft.run(build, false).then(() => {
             matchingFiles.should.containEql("src/anotherfile.txt");
-            matchingFiles.length.should.equal(5);
+            matchingFiles.length.should.equal(6);
+        });
+    });
+
+
+    it("Must omit file patterns", () => {
+        const matchingFiles = [];
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.watch(["*.txt", "*.html", "!src/somefile.txt", "!src/zomg.txt"], async function(filePath) {
+                matchingFiles.push(filePath);
+            }, "copy_files");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        debugger;
+        return crankshaft.run(build, false).then(() => {
+            matchingFiles.length.should.equal(4);
+        });
+    });
+
+
+    it("Must omit directory patterns", () => {
+        const matchingFiles = [];
+        const build = crankshaft.create({ threads: 4 });
+        const createConfig = function() {
+            this.watch(["*.txt", "*.html", "!inner/"], async function(filePath) {
+                matchingFiles.push(filePath);
+            }, "copy_files");
+        }
+        const config = build.configure(createConfig, 'fixtures');
+        debugger;
+        return crankshaft.run(build, false).then(() => {
+            matchingFiles.length.should.equal(4);
         });
     });
 
@@ -130,7 +168,7 @@ describe("Crankshaft build", () => {
     });
 
 
-    it("Must dequeue specified job", () => {
+    it("Must dequeue job", () => {
         let restarted = false;
         const build = crankshaft.create({ threads: 4 });
         const createConfig = function() {
@@ -148,6 +186,75 @@ describe("Crankshaft build", () => {
             restarted.should.be.false();
         });
     });
+
+    /*
+        These tests will not run on windows
+    */
+    const isWin = /^win/.test(process.platform);
+    if (!isWin) {
+        it("A full flow example must run without errors (*nix only)", () => {
+            const matchingFiles = [];
+            const build = crankshaft.create({ threads: 4 });
+
+            let buildStarted = false;
+            build.onStart(() => {
+                buildStarted = true;
+            });
+
+            let buildCompleted = false;
+            build.onStart(() => {
+                buildCompleted = true;
+            });
+
+            const copyTextAndHtmlFiles = function() {
+                //Copy all txt and html files, except zomg.txt and those in the temp/ directory
+                this.watch(["*.txt", "*.html", "!src/zomg.txt", "!temp/"], async function(filePath) {
+                    await exec(`cp ${filePath} temp`);
+                }, "copy_text_and_html_files");
+            }
+            //Start this task list in the "fixtures" directory
+            build.configure(copyTextAndHtmlFiles, 'fixtures');
+
+            let configStarted = false;
+            let configCompleted = false;
+            const copyJsonFiles = function() {
+                //task lists also have an onStart
+                this.onStart(() => {
+                    //You can do something useful here.
+                    //await exec(`ls src`);
+
+                    configStarted = true;
+                });
+
+                //Copy all json files, except those in the temp/ directory
+                this.watch(["*.txt", "!temp/"], async function(filePath) {
+                    await exec(`cp ${filePath} temp`);
+                }, "copy_json_files");
+
+                //task lists also have an onComplete
+                this.onComplete(() => {
+                    //You can wrap up things here.
+                    //await exec(`ls src`);
+
+                    configCompleted = true;
+                });
+            }
+            //Start this task list in the "fixtures" directory
+            build.configure(copyJsonFiles, 'fixtures');
+
+            return crankshaft.run(build, false).then(() => {
+                buildStarted.should.be.true();
+                buildCompleted.should.be.true();
+
+                configStarted.should.be.true();
+                configCompleted.should.be.true();
+
+                //Number of files in the temp directory must be 5
+                const files = fs.readdirSync("fixtures/temp");
+                files.length.should.equal(6);
+            });
+        });
+    }
 
 
     /*
