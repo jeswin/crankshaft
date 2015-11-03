@@ -4,13 +4,13 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "description": "Build System.",
   "repository": {
     "type": "git",
     "url": "https://github.com/jeswin/crankshaft.git"
   },
-  "main": "lib",
+  "main": "dist",
   "dependencies": {
     "babel-runtime": "*",
     "nodefunc-promisify": "*"
