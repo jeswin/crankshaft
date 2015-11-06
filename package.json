@@ -4,7 +4,7 @@
     "email": "jeswinpk@agilehead.com"
   },
   "name": "crankshaft",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "description": "Build System.",
   "repository": {
     "type": "git",
@@ -20,7 +20,11 @@
     "should": "*",
     "touch": "*",
     "fs-extra": "*",
-    "babel-preset-stage-2": "*"
+    "babel-polyfill": "*",
+    "babel-preset-es2015": "*",
+    "babel-preset-react": "*",
+    "babel-preset-stage-2": "*",
+    "babel-plugin-transform-async-to-generator": "*"
   },
   "keywords": [
     "build",

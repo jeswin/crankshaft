@@ -194,7 +194,7 @@ class Watch extends Job {
             const alreadyWalked = walkedDirectories.filter(function(d) { return d.dir === pattern.dir && d.recurse === pattern.recurse && d.important === pattern.important; });
             if (alreadyWalked.length) {
                 return async function() {
-                    const cachedWalkResult = {};
+                    let cachedWalkResult = {};
                     cachedWalkResult.dir = pattern.dir;
                     cachedWalkResult.recurse = pattern.recurse;
                     cachedWalkResult.important = pattern.important;

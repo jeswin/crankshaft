@@ -19,9 +19,9 @@ class JobQueue {
 
 
     job(fn, name, deps) {
-        const job = new Job(fn, name, deps, this);
-        this.jobs.push(job);
-        return job;
+        const _job = new Job(fn, name, deps, this);
+        this.jobs.push(_job);
+        return _job;
     }
 
 
@@ -66,7 +66,7 @@ class JobQueue {
             const runner = new JobRunner(this, { threads: this.build.options.threads });
             await runner.run(job);
         } else {
-            throw new Error("The job " + fn + " was not found");
+            throw new Error(`The job ${name} was not found`);
         }
     }
 
