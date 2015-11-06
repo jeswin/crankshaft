@@ -19,7 +19,8 @@
     "mocha": "*",
     "should": "*",
     "touch": "*",
-    "fs-extra": "*"
+    "fs-extra": "*",
+    "babel-preset-stage-2": "*"
   },
   "keywords": [
     "build",
