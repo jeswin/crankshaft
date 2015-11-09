@@ -1,11 +1,13 @@
 /*
     Some external libs and functions we'll use in our build script
 */
+import __polyfill from "babel-polyfill";
+
 import promisify from 'nodefunc-promisify';
 import path from 'path';
 import childProcess from 'child_process';
 import should from 'should';
-import crankshaft from "..";
+import crankshaft from "../crankshaft";
 import touch from "touch";
 import fs from "fs-extra";
 
