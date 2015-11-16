@@ -109,7 +109,6 @@ describe("Crankshaft build", () => {
             }, "copy_files");
         }
         const config = build.configure(createConfig, 'fixtures');
-        debugger;
         return crankshaft.run(build, false).then(() => {
             matchingFiles.length.should.equal(4);
         });
@@ -125,7 +124,6 @@ describe("Crankshaft build", () => {
             }, "copy_files");
         }
         const config = build.configure(createConfig, 'fixtures');
-        debugger;
         return crankshaft.run(build, false).then(() => {
             matchingFiles.length.should.equal(4);
         });
