@@ -3,12 +3,12 @@ import JobQueue from "./jobqueue";
 
 export default class Job {
 
-    fn: FnActionType;
+    fn: () => Promise;
     name: string;
     deps: Array<string>;
     parent: ?JobQueue;
 
-    constructor(fn: FnActionType, name?: string, deps?: Array<string>, parent?: JobQueue) {
+    constructor(fn: () => Promise, name?: string, deps?: Array<string>, parent?: JobQueue) {
         this.fn = fn;
         this.name = name || this.randomString(24);
 
@@ -31,7 +31,7 @@ export default class Job {
     }
 
 
-    async getTasks() : Promise<Array<FnActionType>> {
+    async getTasks() : Promise<Array<() => Promise>> {
         const self = this;
         return [async function() { await self.fn(); }];
     };

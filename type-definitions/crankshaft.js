@@ -3,8 +3,6 @@ type PatternType = {
     dir: string,
     important: boolean,
     regex: RegExp,
-    exclude: boolean,
+    exclude: string,
     recurse: boolean
 };
-
-type FnActionType = () => Promise;

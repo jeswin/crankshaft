@@ -1,28 +1,28 @@
 /* @flow */
 import Job from './job';
+import JobQueue from "./jobqueue";
 
 type JobRunnerOptionsType = { threads: number };
-type JobListEntryType = { job: Job, completedTasks: number, totalTasks: number, isStarting: boolean };
+type JobListEntryType = { job: Job, tasks: Array<() => Promise>, initialized: boolean, completedTasks: number, totalTasks: number, isStarting: boolean };
 type JobListType = Array<JobListEntryType>;
 
 export default class JobRunner {
 
     queue: JobQueue;
-    options: JobRunnerOptionsType;
+    threads: number;
     isRunning: boolean;
 
-    constructor(queue: JobQueue, options: JobRunnerOptionsType) {
+    constructor(queue: JobQueue) {
         this.queue = queue;
-        this.options = options || { threads : 1};
-        isRunning = false;
+        this.threads = queue.threads || 4;
+        this.isRunning = false;
     }
-
 
     /*
         Runs a list of jobs.
         Dependent jobs must be in the list, or must be in queue.jobs.
     */
-    async run(jobs: Job|Array<Job>) : Promise {
+    async run(jobs: Array<Job>) : Promise {
         if (!(jobs instanceof Array)) {
             jobs = [jobs];
         }
@@ -58,11 +58,11 @@ export default class JobRunner {
 
         let activeThreads = 0;
 
-        // The scheduler will schedule as many threads as needed to match self.options.threads
+        // The scheduler will schedule as many threads as needed to match self.threads
         // generatorRecursionCount is used to set a max limit on how many times generators recurse.
         const scheduler = function(generatorRecursionCount) {
             const pseudoThreads = [];
-            let threadCtr = self.options.threads - activeThreads;
+            let threadCtr = self.threads - activeThreads;
             activeThreads += threadCtr;
             if (threadCtr > 0) {
                 generatorRecursionCount += threadCtr;
@@ -78,12 +78,11 @@ export default class JobRunner {
         // This is where actual work happens.
         const next = async function(generatorRecursionCount) {
             // Signal all jobs that can run
-            let fn: FnActionType;
-            let jobData: JobListEntryType;
-            let signaled = jobList.filter(canSignal);
+            const signaled = jobList.filter(canSignal);
 
             for(let i = 0; i < signaled.length; i++) {
-                if (typeof(signaled[i].tasks) === "undefined") {
+                if (!signaled[i].initialized) {
+                    signaled[i].initialized = true;
                     signaled[i].isStarting = true;
                     signaled[i].tasks = await signaled[i].job.getTasks();
                     signaled[i].totalTasks = signaled[i].tasks.length;
@@ -93,22 +92,19 @@ export default class JobRunner {
 
             for(let i = 0; i < signaled.length; i++) {
                 if (signaled[i].tasks && signaled[i].tasks.length) {
-                    fn = signaled[i].tasks.shift();
-                    jobData = signaled[i];
+                    const jobData: JobListEntryType = signaled[i];
+                    const fn: () => Promise = jobData.tasks.shift();
+                    await fn();
+                    jobData.completedTasks++;
+                    if (generatorRecursionCount < 400) {
+                        const pseudoThreads = scheduler(generatorRecursionCount);
+                        let promises = pseudoThreads.map(f => f());
+                        await Promise.all(promises);
+                    }
                     break;
                 }
             }
 
-            if (fn) {
-                await fn();
-                jobData.completedTasks++;
-
-                if (generatorRecursionCount < 400) {
-                    const pseudoThreads = scheduler(generatorRecursionCount);
-                    let promises = pseudoThreads.map(f => f());
-                    await Promise.all(promises);
-                }
-            }
             activeThreads--;
         };
 
@@ -126,6 +122,9 @@ export default class JobRunner {
                     job: job,
                     completedTasks: 0,
                     totalTasks: 0,
+                    isStarting: false,
+                    tasks: [],
+                    initialized: false
                 });
 
                 //Find all dependent jobs

@@ -18,11 +18,11 @@ export default class Build extends JobQueue {
     monitor: boolean;
     monitoring: boolean;
 
-
-    constructor(options: JobQueueOptionsType) {
-        super(process.cwd(), options);
+    constructor(threads: number) {
+        super(process.cwd());
         this.configs = [];
         this.state = {};
+        this.threads = threads;
     }
 
 
@@ -37,7 +37,6 @@ export default class Build extends JobQueue {
         const self = this;
 
         this.monitor = monitor;
-        const options = { threads: this.options.threads };
 
         this.activeJobs.push(
             new Job(async function() {
