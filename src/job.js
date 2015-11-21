@@ -1,6 +1,14 @@
-class Job {
+/* @flow */
+import JobQueue from "./jobqueue";
 
-    constructor(fn, name, deps, parent, options) {
+export default class Job {
+
+    fn: FnActionType;
+    name: string;
+    deps: Array<string>;
+    parent: ?JobQueue;
+
+    constructor(fn: FnActionType, name?: string, deps?: Array<string>, parent?: JobQueue) {
         this.fn = fn;
         this.name = name || this.randomString(24);
 
@@ -12,7 +20,7 @@ class Job {
     }
 
 
-    randomString(len) {
+    randomString(len: number) : string {
         var text = "";
         var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -23,10 +31,8 @@ class Job {
     }
 
 
-    async getTasks() {
+    async getTasks() : Promise<Array<FnActionType>> {
         const self = this;
         return [async function() { await self.fn(); }];
     };
 }
-
-export default Job;

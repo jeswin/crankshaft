@@ -1,27 +1,34 @@
-import JobQueue from './jobqueue';
-import Watch from './watch';
+/* @flow */
 import fs from 'fs';
 import path from 'path';
+import Watch from './watch';
+import Job from "./job";
+import Build from "./build";
+import JobQueue from './jobqueue';
 
-class Configuration extends JobQueue {
+type FnOnFileChangeType = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
 
-    constructor(root, build) {
+export default class Configuration extends JobQueue {
+
+    watchJobs: Array<Watch>;
+    state: Object;
+
+    constructor(root: string, build: Build) {
         super(root, build);
         this.watchJobs = [];
     }
 
 
-    watch(patterns, fn, name, deps) {
-        if (typeof patterns === "string")
-            patterns = [patterns];
-        const job = new Watch(patterns, fn, name, deps, this, {});
+    watch(patterns: string | Array<string> | Array<PatternType>, fn: FnActionType, name: string, deps: Array<string>) {
+        const _patterns: Array<string> | Array<PatternType> = (typeof patterns === "string") ? [patterns] : patterns;
+        const job = new Watch(_patterns, fn, name, deps, this, {});
         this.activeJobs.push(job);
         this.watchJobs.push(job);
         return job;
     }
 
 
-    startMonitoring(onFileChange) {
+    startMonitoring(onFileChange: FnOnFileChangeType) {
         const self = this;
         this.watchJobs.forEach(function(job) {
             job.startMonitoring(onFileChange);
@@ -29,5 +36,3 @@ class Configuration extends JobQueue {
     }
 
 }
-
-export default Configuration;

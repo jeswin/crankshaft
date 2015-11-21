@@ -1,10 +1,20 @@
-import Job from './job'
+/* @flow */
+import Job from './job';
 
-class JobRunner {
+type JobRunnerOptionsType = { threads: number };
+type JobListEntryType = { job: Job, completedTasks: number, totalTasks: number, isStarting: boolean };
+type JobListType = Array<JobListEntryType>;
 
-    constructor(queue, options) {
+export default class JobRunner {
+
+    queue: JobQueue;
+    options: JobRunnerOptionsType;
+    isRunning: boolean;
+
+    constructor(queue: JobQueue, options: JobRunnerOptionsType) {
         this.queue = queue;
         this.options = options || { threads : 1};
+        isRunning = false;
     }
 
 
@@ -12,13 +22,13 @@ class JobRunner {
         Runs a list of jobs.
         Dependent jobs must be in the list, or must be in queue.jobs.
     */
-    async run(jobs) {
+    async run(jobs: Job|Array<Job>) : Promise {
         if (!(jobs instanceof Array)) {
             jobs = [jobs];
         }
 
         const self = this;
-        const jobList = [];
+        const jobList: JobListType = [];
 
         if (this.isRunning)
             throw new Error("Cannot call JobRunner.run() while it is already in running state");
@@ -68,7 +78,8 @@ class JobRunner {
         // This is where actual work happens.
         const next = async function(generatorRecursionCount) {
             // Signal all jobs that can run
-            let fn, jobData;
+            let fn: FnActionType;
+            let jobData: JobListEntryType;
             let signaled = jobList.filter(canSignal);
 
             for(let i = 0; i < signaled.length; i++) {
@@ -101,7 +112,7 @@ class JobRunner {
             activeThreads--;
         };
 
-        const addToJobList = function(job, jobList) {
+        const addToJobList = function(job: Job, jobList: JobListType) {
             //See if the job is already in the jobList
             const isInList = jobList.some(function(item) {
                 return item.job.name === job.name;
@@ -147,5 +158,3 @@ class JobRunner {
         this.isRunning = false;
     };
 }
-
-export default JobRunner;

@@ -1,49 +1,52 @@
+/* @flow */
 import fs from 'fs';
 import path from 'path';
 import Job from './job';
 import Configuration from './configuration';
 import JobQueue from './jobqueue';
 
-
-let sleep = function(ms) {
-    return new Promise(r => setTimeout(r, ms));
+let sleep = function(ms: number) : Promise {
+    return new Promise((resolve, reject) => { setTimeout(resolve, ms); });
 };
 
+type FnConfigureType = (config: Configuration) => Configuration;
 
-class Build extends JobQueue {
+export default class Build extends JobQueue {
 
-    constructor(options) {
-        super(process.cwd());
-        this.build = this;
+    configs: Array<Configuration>;
+    state: Object;
+    monitor: boolean;
+    monitoring: boolean;
+
+
+    constructor(options: JobQueueOptionsType) {
+        super(process.cwd(), options);
         this.configs = [];
         this.state = {};
-
-        this.options = options || {};
-        this.options.threads = this.options.threads || 4;
     }
 
 
-    configure(fn, root) {
+    configure(fn: FnConfigureType, root: string) : Configuration {
         const configuration = new Configuration(root, this);
         this.configs.push(configuration);
-        fn.call(configuration);
-        return configuration;
+        return fn(configuration);
     }
 
 
-    async start(monitor, cb) {
+    async start(monitor: boolean, cb: () => void) : Promise {
         const self = this;
 
-        this.jobQueue = [];
         this.monitor = monitor;
-
         const options = { threads: this.options.threads };
 
         this.activeJobs.push(
             new Job(async function() {
                 for (let i = 0; i < self.configs.length; i++) {
-                    self.configs[i].state = {};
-                    await self.configs[i].runJobs();
+                    const config = self.configs[i];
+                    process.chdir(config.root);
+                    config.state = {};
+                    await config.runJobs();
+                    process.chdir(self.root);
                 }
             })
         );
@@ -57,7 +60,7 @@ class Build extends JobQueue {
     }
 
 
-    async startMonitoring() {
+    async startMonitoring() : Promise {
         const self = this;
         const fileChangeEvents = [];
         let processedCycle = []; //The files which have changed in this change cycle
@@ -123,5 +126,3 @@ class Build extends JobQueue {
         }
     }
 }
-
-export default Build;

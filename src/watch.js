@@ -1,3 +1,4 @@
+/* @flow */
 import fs from 'fs';
 import path from 'path';
 import promisify from 'nodefunc-promisify';
@@ -37,10 +38,33 @@ const getExcludeDirectoryPredicate = function(dir, root, pattern) {
 };
 
 
-class Watch extends Job {
+type WatchedFilesEntryType = {
+    path: string,
+    type: string,
+    patterns: Array<PatternType>
+};
 
-    constructor(patterns, fn, name, deps, parent, options) {
-        super(fn, name, deps, parent, options);
+type WatchedDirsEntryType = {
+    path: string,
+    type: string
+};
+
+export default class Watch extends Job {
+
+    patterns: Array<Object>;
+    fn: Function;
+    name: string;
+    deps: Array<string>;
+    parent: JobQueue;
+    watchedFiles: Array<WatchedFilesEntryType>;
+    watchedDirs: Array<WatchedDirsEntryType>;
+    watchIndex: Object;
+    excludedPatterns: Array<PatternType>;
+    excludedDirectories: Array<PatternType>;
+
+
+    constructor(patterns: Array<string> | Array<PatternType>, fn: FnActionType, name: string, deps: Array<string>, parent: JobQueue) {
+        super(fn, name, deps, parent);
 
         this.patterns = [];
         this.excludedPatterns = [];
@@ -136,7 +160,7 @@ class Watch extends Job {
     }
 
 
-    async getTasks() {
+    async getTasks() : Promise {
         const self = this;
 
         const directoryCache = {};
@@ -349,5 +373,3 @@ class Watch extends Job {
         });
     };
 }
-
-export default Watch;

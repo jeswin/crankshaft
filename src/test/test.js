@@ -42,8 +42,8 @@ describe("Crankshaft build", () => {
 
     it("Must add function to the configuration's startup jobs", () => {
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.onStart(async function() {
+        const createConfig = function(config) {
+            config.onStart(async function() {
             }, "start_build");
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -56,8 +56,8 @@ describe("Crankshaft build", () => {
 
     it("Must add function to the configuration's completion jobs", () => {
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.onComplete(async function() {
+        const createConfig = function(config) {
+            config.onComplete(async function() {
             }, "complete_build");
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -70,10 +70,10 @@ describe("Crankshaft build", () => {
 
     it("Must add task create_dirs depedent on start_build", () => {
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.onStart(async function() {
+        const createConfig = function(config) {
+            config.onStart(async function() {
             }, "start_build");
-            this.onStart(async function() {
+            config.onStart(async function() {
             }, "create_dirs", ["start_build"]);
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -87,8 +87,8 @@ describe("Crankshaft build", () => {
     it("Must return filenames matching patterns", () => {
         const matchingFiles = [];
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.watch(["*.txt", "*.html"], async function(filePath) {
+        const createConfig = function(config) {
+            config.watch(["*.txt", "*.html"], async function(filePath) {
                 matchingFiles.push(filePath);
             }, "copy_files");
         }
@@ -103,8 +103,8 @@ describe("Crankshaft build", () => {
     it("Must omit file patterns", () => {
         const matchingFiles = [];
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.watch(["*.txt", "*.html", "!src/somefile.txt", "!src/zomg.txt"], async function(filePath) {
+        const createConfig = function(config) {
+            config.watch(["*.txt", "*.html", "!src/somefile.txt", "!src/zomg.txt"], async function(filePath) {
                 matchingFiles.push(filePath);
             }, "copy_files");
         }
@@ -118,8 +118,8 @@ describe("Crankshaft build", () => {
     it("Must omit directory patterns", () => {
         const matchingFiles = [];
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            this.watch(["*.txt", "*.html", "!inner/"], async function(filePath) {
+        const createConfig = function(config) {
+            config.watch(["*.txt", "*.html", "!inner/"], async function(filePath) {
                 matchingFiles.push(filePath);
             }, "copy_files");
         }
@@ -133,13 +133,12 @@ describe("Crankshaft build", () => {
     it("Must run a job", () => {
         let restarted = false;
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            var self = this;
-            this.job(async function() {
+        const createConfig = function(config) {
+            config.job(async function() {
                 restarted = true;
             }, "fake_server_restart");
-            this.onComplete(async function() {
-                await self.run("fake_server_restart");
+            config.onComplete(async function() {
+                await config.run("fake_server_restart");
             }, "complete_build");
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -152,13 +151,12 @@ describe("Crankshaft build", () => {
     it("Must run queued jobs", () => {
         let restarted = false;
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            var self = this;
-            this.job(async function() {
+        const createConfig = function(config) {
+            config.job(async function() {
                 restarted = true;
             }, "fake_server_restart");
-            this.onComplete(async function() {
-                self.queue("fake_server_restart");
+            config.onComplete(async function() {
+                config.queue("fake_server_restart");
             }, "complete_build");
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -171,14 +169,13 @@ describe("Crankshaft build", () => {
     it("Must dequeue job", () => {
         let restarted = false;
         const build = crankshaft.create({ threads: 4 });
-        const createConfig = function() {
-            var self = this;
-            this.job(async function() {
+        const createConfig = function(config) {
+            config.job(async function() {
                 restarted = true;
             }, "fake_server_restart");
-            this.onComplete(async function() {
-                self.queue("fake_server_restart");
-                self.dequeue("fake_server_restart");
+            config.onComplete(async function() {
+                config.queue("fake_server_restart");
+                config.dequeue("fake_server_restart");
             }, "complete_build");
         }
         const config = build.configure(createConfig, 'fixtures');
@@ -206,9 +203,9 @@ describe("Crankshaft build", () => {
                 buildCompleted = true;
             });
 
-            const copyTextAndHtmlFiles = function() {
+            const copyTextAndHtmlFiles = function(config) {
                 //Copy all txt and html files, except zomg.txt and those in the temp/ directory
-                this.watch(["*.txt", "*.html", "!src/zomg.txt", "!temp/"], async function(filePath) {
+                config.watch(["*.txt", "*.html", "!src/zomg.txt", "!temp/"], async function(filePath) {
                     await exec(`cp ${filePath} temp`);
                 }, "copy_text_and_html_files");
             }
@@ -217,9 +214,9 @@ describe("Crankshaft build", () => {
 
             let configStarted = false;
             let configCompleted = false;
-            const copyJsonFiles = function() {
+            const copyJsonFiles = function(config) {
                 //task lists also have an onStart
-                this.onStart(() => {
+                config.onStart(() => {
                     //You can do something useful here.
                     //await exec(`ls src`);
 
@@ -227,12 +224,12 @@ describe("Crankshaft build", () => {
                 });
 
                 //Copy all json files, except those in the temp/ directory
-                this.watch(["*.txt", "!temp/"], async function(filePath) {
+                config.watch(["*.txt", "!temp/"], async function(filePath) {
                     await exec(`cp ${filePath} temp`);
                 }, "copy_json_files");
 
                 //task lists also have an onComplete
-                this.onComplete(() => {
+                config.onComplete(() => {
                     //You can wrap up things here.
                     //await exec(`ls src`);
 
@@ -272,8 +269,8 @@ describe("Crankshaft build", () => {
                 touch(`fixtures/${watchedFile}`);
             }, 500);
         });
-        const createConfig = function() {
-            this.watch(["*.txt", "*.html"], async function(filePath) {
+        const createConfig = function(config) {
+            config.watch(["*.txt", "*.html"], async function(filePath) {
                 if (isWatching && watchedFile === filePath) {
                     done();
                 }

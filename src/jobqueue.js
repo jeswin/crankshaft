@@ -1,50 +1,60 @@
+/* @flow */
 import Job from './job';
 import Watch from './watch';
 import JobRunner from './jobrunner';
+import Build from "./build";
 
-class JobQueue {
+type JobQueueOptionsType = { threads: number };
 
-    constructor(root, build) {
+export default class JobQueue {
+
+    root: string;
+    activeJobs: Array<Job>;
+    jobs: Array<Job>;
+    onStartJobs: Array<Job>;
+    onCompleteJobs: Array<Job>;
+    queuedJobs: Array<Job>;
+    build: Build;
+    options: JobQueueOptionsType;
+
+    constructor(root: string, options: JobQueueOptionsType) {
         this.root = root;
         this.activeJobs = [];
         this.jobs = [];
         this.onStartJobs = [];
         this.onCompleteJobs = [];
         this.queuedJobs = [];
-
-        if (build) {
-            this.build = build;
-        }
+        this.options = this.options || { threads: 4 };
     }
 
 
-    job(fn, name, deps) {
+    job(fn: FnActionType, name: string, deps: Array<string>) : Job {
         const _job = new Job(fn, name, deps, this);
         this.jobs.push(_job);
         return _job;
     }
 
 
-    onStart(fn, name, deps) {
+    onStart(fn: FnActionType, name: string, deps: Array<string>) : Job {
         const job = new Job(fn, name, deps, this);
         this.onStartJobs.push(job);
         return job;
     }
 
 
-    onComplete(fn, name, deps) {
+    onComplete(fn: FnActionType, name: string, deps: Array<string>) : Job {
         const job = new Job(fn, name, deps, this);
         this.onCompleteJobs.push(job);
         return job;
     }
 
 
-    dequeue(name) {
+    dequeue(name: string) {
         this.queuedJobs = this.queuedJobs.filter(j => j.name !== name);
     }
 
 
-    queue(name, allowDuplicates) {
+    queue(name: string, allowDuplicates: boolean) {
         if (allowDuplicates !== false || !this.queuedJobs.some(j => j.name === name)) {
             const matchingJob = this.jobs.filter(j => j.name === name);
             if (!matchingJob.length) {
@@ -57,13 +67,13 @@ class JobQueue {
     }
 
 
-    async run(name) {
+    async run(name: string) : Promise {
         const jobs = this.jobs.filter(function(t) {
             return t.name === name;
         });
         if (jobs.length) {
             const job = jobs[0];
-            const runner = new JobRunner(this, { threads: this.build.options.threads });
+            const runner = new JobRunner(this, { threads: this.options.threads });
             await runner.run(job);
         } else {
             throw new Error(`The job ${name} was not found`);
@@ -71,21 +81,19 @@ class JobQueue {
     }
 
 
-    async runQueuedJobs() {
+    async runQueuedJobs() : Promise {
         while (this.queuedJobs.length) {
             const job  = this.queuedJobs.shift();
-            const runner = new JobRunner(this, { threads: this.build.options.threads });
+            const runner = new JobRunner(this, { threads: this.options.threads });
             await runner.run(job);
         }
     }
 
 
-    async runJobs() {
+    async runJobs() : Promise {
         this.queuedJobs = [];
 
-        process.chdir(this.root);
-
-        const options = { threads: this.build.options.threads };
+        const options = { threads: this.options.threads };
 
         const startRunner = new JobRunner(this, options);
         await startRunner.run(this.onStartJobs);
@@ -97,9 +105,5 @@ class JobQueue {
         await completionRunner.run(this.onCompleteJobs);
 
         await this.runQueuedJobs();
-
-        process.chdir(this.build.root);
     }
 }
-
-export default JobQueue;
