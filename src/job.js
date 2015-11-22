@@ -1,7 +1,6 @@
 /* @flow */
-import JobQueue from "./jobqueue";
 
-export default class Job<TParent : JobQueue> {
+export default class Job<TParent> {
 
     fn: () => Promise;
     name: string;

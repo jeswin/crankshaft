@@ -4,11 +4,13 @@ import path from 'path';
 import promisify from 'nodefunc-promisify';
 import { ensureLeadingSlash, ensureTrailingSlash, resolveDirPath } from "./filepath-utils";
 import Job from './job';
-import Configuration from "./configuration";
-import JobQueue from "./jobqueue";
 import WatchPattern from "./watch-pattern";
 
-type OnFileChangeDelegate = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
+type IConfiguration = {
+    root: string
+};
+
+type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Job, config: IConfiguration) => void;
 
 type WatchedFilesEntryType = {
     path: string,
@@ -56,7 +58,7 @@ const getExcludeDirectoryPredicate = function(dir, root, pattern) {
 };
 
 
-export default class Watch extends Job<Configuration> {
+export default class Watch extends Job<IConfiguration> {
 
     path: string;
     fileWatcher: Object;
@@ -68,7 +70,7 @@ export default class Watch extends Job<Configuration> {
     excludedDirectories: Array<WatchPattern>;
 
 
-    constructor(patterns: Array<WatchPattern>, fn: () => Promise, parent: Configuration, name: string, deps: Array<string>) {
+    constructor(patterns: Array<WatchPattern>, fn: () => Promise, parent: IConfiguration, name: string, deps: Array<string>) {
         super(fn, parent, name, deps);
 
         this.patterns = patterns;
@@ -241,7 +243,7 @@ export default class Watch extends Job<Configuration> {
         const self = this;
 
         //Fire fileChange if path conditions are met.
-        const onFileChange = function(ev, watch, self) {
+        const onFileChange = function(ev, watch) {
             _onFileChange(ev, watch, self, self.parent);
         };
 
@@ -251,7 +253,7 @@ export default class Watch extends Job<Configuration> {
         this.watchedFiles.forEach(function(watch) {
             const resolvedPath = path.resolve(self.parent.root, watch.path);
             const fileWatcher = fs.watch(watch.path, function(ev, filename) {
-                onFileChange(ev, watch, self);
+                onFileChange(ev, watch);
             });
             watch.fileWatcher = fileWatcher;
             self.watchIndex[watch.path] = watch;
@@ -266,7 +268,7 @@ export default class Watch extends Job<Configuration> {
 
                 //If there is an existing fileWatcher, the file is already being watched.
                 if (self.watchIndex[filePath]) {
-                    onFileChange(ev, self.watchIndex[filePath], self);
+                    onFileChange(ev, self.watchIndex[filePath]);
                 } else {
                     const resolvedPath = path.resolve(self.parent.root, filePath);
                     const matchingPatterns = self.patterns.filter(function(pattern) {
@@ -281,15 +283,17 @@ export default class Watch extends Job<Configuration> {
                     });
 
                     if (matchingPatterns.length) {
-                        const fileWatcher = fs.watch(filePath, function(ev, filename) {
-                            onFileChange(ev, watch, self);
-                        });
-                        self.watchIndex[filePath] = {
+                        const watchInfo : WatchedFilesEntryType = {
                             path: filePath,
-                            fileWatcher: fileWatcher,
+                            fileWatcher: null,
                             type: "file",
                             patterns: matchingPatterns
                         };
+                        const fileWatcher = fs.watch(filePath, function(ev, filename) {
+                            onFileChange(ev, watchInfo);
+                        });
+                        watchInfo.fileWatcher = fileWatcher;
+                        self.watchIndex[filePath] = watchInfo;
                     }
                 }
             });

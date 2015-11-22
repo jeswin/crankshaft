@@ -3,11 +3,21 @@ import fs from 'fs';
 import path from 'path';
 import Watch from './watch';
 import Job from "./job";
-import Build from "./build";
 import JobQueue from './jobqueue';
 import WatchPattern from "./watch-pattern";
 
-type OnFileChangeDelegate = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
+type IConfiguration = {
+    root: string
+};
+
+type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Job, config: IConfiguration) => void;
+
+type WatchedFilesEntryType = {
+    path: string,
+    type: string,
+    patterns: Array<WatchPattern>,
+    fileWatcher: any
+};
 
 export default class Configuration extends JobQueue {
 

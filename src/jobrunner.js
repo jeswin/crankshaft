@@ -1,18 +1,28 @@
 /* @flow */
 import Job from './job';
-import JobQueue from "./jobqueue";
 
-type JobRunnerOptionsType = { threads: number };
-type JobListEntryType = { job: Job, tasks: Array<() => Promise>, initialized: boolean, completedTasks: number, totalTasks: number, isStarting: boolean };
+type IJobQueue = {
+    jobs: Array<Job>
+};
+
+type JobListEntryType = {
+    job: Job,
+    tasks: Array<() => Promise>,
+    initialized: boolean,
+    completedTasks: number,
+    totalTasks: number,
+    isStarting: boolean
+};
+
 type JobListType = Array<JobListEntryType>;
 
 export default class JobRunner {
 
-    queue: JobQueue;
+    queue: IJobQueue;
     threads: number;
     isRunning: boolean;
 
-    constructor(queue: JobQueue) {
+    constructor(queue: IJobQueue) {
         this.queue = queue;
         this.threads = queue.threads || 4;
         this.isRunning = false;

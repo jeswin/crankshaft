@@ -1,6 +1,5 @@
 /* @flow */
 import Job from './job';
-import Watch from './watch';
 import JobRunner from './jobrunner';
 import Build from "./build";
 

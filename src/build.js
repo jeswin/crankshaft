@@ -9,7 +9,7 @@ let sleep = function(ms: number) : Promise {
     return new Promise((resolve, reject) => { setTimeout(resolve, ms); });
 };
 
-type FnConfigureType = (config: Configuration) => Configuration;
+type ConfigureDelegate = (config: Configuration) => Configuration;
 
 export default class Build extends JobQueue {
 
@@ -26,7 +26,7 @@ export default class Build extends JobQueue {
     }
 
 
-    configure(fn: FnConfigureType, root: string) : Configuration {
+    configure(fn: ConfigureDelegate, root: string) : Configuration {
         const configuration = new Configuration(root, this);
         this.configs.push(configuration);
         return fn(configuration);
@@ -67,7 +67,7 @@ export default class Build extends JobQueue {
 
         const onFileChange = function(ev, watch, job, config) {
             if (!fileChangeEvents.concat(processedCycle).some(function(c) { return c.watch.path === watch.path && c.config === config; })) {
-                fileChangeEvents.push({ ev: ev, watch: watch, job: job, config: config });
+                fileChangeEvents.push({ ev, watch, job, config });
             }
         };
 
