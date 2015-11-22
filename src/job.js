@@ -1,14 +1,14 @@
 /* @flow */
 import JobQueue from "./jobqueue";
 
-export default class Job {
+export default class Job<TParent : JobQueue> {
 
     fn: () => Promise;
     name: string;
     deps: Array<string>;
-    parent: ?JobQueue;
+    parent: TParent;
 
-    constructor(fn: () => Promise, name?: string, deps?: Array<string>, parent?: JobQueue) {
+    constructor(fn: () => Promise, parent: TParent, name: string = "", deps: Array<string> = []) {
         this.fn = fn;
         this.name = name || this.randomString(24);
 

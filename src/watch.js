@@ -2,16 +2,19 @@
 import fs from 'fs';
 import path from 'path';
 import promisify from 'nodefunc-promisify';
-import Job from './job';
 import { ensureLeadingSlash, ensureTrailingSlash, resolveDirPath } from "./filepath-utils";
+import Job from './job';
+import Configuration from "./configuration";
+import JobQueue from "./jobqueue";
+import WatchPattern from "./watch-pattern";
 
-type FnOnFileChangeType = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
+type OnFileChangeDelegate = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
 
 type WatchedFilesEntryType = {
     path: string,
     type: string,
-    patterns: Array<PatternType>,
-    fileWatcher: Object
+    patterns: Array<WatchPattern>,
+    fileWatcher: any
 };
 
 type WatchedDirsEntryType = {
@@ -28,13 +31,15 @@ type WalkResultType = {
     dir: string,
     recurse: boolean,
     important: boolean,
-    pattern: PatternType,
-    entries: Array<WalkResultEntriesItemType>
+    pattern: WatchPattern,
+    entries: {
+        paths: Array<WalkResultEntriesItemType>
+    }
 };
 
 
-let readdir = promisify(fs.readdir.bind(fs));
-let stat = promisify(fs.stat.bind(fs));
+const readdir = promisify(fs.readdir.bind(fs));
+const stat = promisify(fs.stat.bind(fs));
 
 
 /*
@@ -51,22 +56,20 @@ const getExcludeDirectoryPredicate = function(dir, root, pattern) {
 };
 
 
-export default class Watch extends Job {
+export default class Watch extends Job<Configuration> {
 
+    path: string;
+    fileWatcher: Object;
     patterns: Array<Object>;
-    fn: Function;
-    name: string;
-    deps: Array<string>;
-    parent: JobQueue;
     watchedFiles: Array<WatchedFilesEntryType>;
     watchedDirs: Array<WatchedDirsEntryType>;
     watchIndex: Object;
-    excludedPatterns: Array<PatternType>;
-    excludedDirectories: Array<PatternType>;
+    excludedPatterns: Array<WatchPattern>;
+    excludedDirectories: Array<WatchPattern>;
 
 
-    constructor(patterns: Array<PatternType>, fn: () => Promise, name: string, deps: Array<string>, parent: JobQueue) {
-        super(fn, name, deps, parent);
+    constructor(patterns: Array<WatchPattern>, fn: () => Promise, parent: Configuration, name: string, deps: Array<string>) {
+        super(fn, parent, name, deps);
 
         this.patterns = patterns;
         this.excludedPatterns = [];
@@ -77,6 +80,7 @@ export default class Watch extends Job {
 
         //This is an index with key as the watched file path and value as match information (watcher, patterns ..)
         this.watchIndex = {};
+
     }
 
 
@@ -101,9 +105,7 @@ export default class Watch extends Job {
                     directoryCache[dir] = dirEntries;
                 }
                 catch(ex) {
-                    if (self.parent.build.options.suppressErrors === false) {
-                        throw ex;
-                    }
+                    throw ex;
                 }
             } else {
                 dirEntries = directoryCache[dir];
@@ -134,30 +136,29 @@ export default class Watch extends Job {
             If a directory has already been walked, the same results are returned.
         */
         const walkedDirectories: Array<WalkResultType> = [];
-        const getDirWalker = function(pattern: PatternType) : Promise<WalkResultType> {
+        const getDirWalker = function(pattern: WatchPattern) : () => Promise<WalkResultType> {
             const alreadyWalked = walkedDirectories.filter(function(d) { return d.dir === pattern.dir && d.recurse === pattern.recurse && d.important === pattern.important; });
             if (alreadyWalked.length) {
                 return async function() {
-                    let cachedWalkResult = {};
-                    cachedWalkResult.dir = pattern.dir;
-                    cachedWalkResult.recurse = pattern.recurse;
-                    cachedWalkResult.important = pattern.important;
-                    cachedWalkResult.pattern = pattern;
-                    cachedWalkResult.entries = alreadyWalked[0].entries;
-                    return cachedWalkResult;
+                    return {
+                        dir: pattern.dir,
+                        recurse: pattern.recurse,
+                        important: pattern.important,
+                        pattern: pattern,
+                        entries: alreadyWalked[0].entries
+                    };
                 };
             } else {
-                const walkResult = {
-                    dir: pattern.dir,
-                    recurse: pattern.recurse,
-                    important: pattern.important,
-                    pattern: pattern
-                };
-                walkedDirectories.push(walkResult);
                 return async function() {
-                    walkResult.entries = {
-                        paths: await walk(pattern.dir, pattern.recurse, pattern, self.excludedDirectories)
+                    const paths = await walk(pattern.dir, pattern.recurse, pattern, self.excludedDirectories);
+                    const walkResult: WalkResultType = {
+                        dir: pattern.dir,
+                        recurse: pattern.recurse,
+                        important: pattern.important,
+                        pattern,
+                        entries: { paths }
                     };
+                    walkedDirectories.push(walkResult);
                     return walkResult;
                 };
             }
@@ -166,10 +167,10 @@ export default class Watch extends Job {
         /*
             If the pattern directory is not excluded, create a dirWalker
         */
-        const dirWalkers = this.patterns.map(function(pattern) {
+        const dirWalkers = this.patterns.filter((pattern) => {
             const predicate = getExcludeDirectoryPredicate(pattern.dir, self.parent.root, pattern);
-            return !self.excludedDirectories.some(predicate) ? getDirWalker(pattern) : null;
-        }).filter(function(pattern) { return typeof pattern !== "undefined" && pattern !== null; });
+            return !self.excludedDirectories.some(predicate);
+        }).map(pattern => getDirWalker(pattern));
 
 
         /*
@@ -211,7 +212,8 @@ export default class Watch extends Job {
                     self.watchedFiles.push({
                         path: entry.path,
                         type: entry.type,
-                        patterns: [pattern]
+                        patterns: [pattern],
+                        fileWatcher: null
                     });
                 }
             }
@@ -235,7 +237,7 @@ export default class Watch extends Job {
         });
     };
 
-    startMonitoring(_onFileChange: FnOnFileChangeType) {
+    startMonitoring(_onFileChange: OnFileChangeDelegate) {
         const self = this;
 
         //Fire fileChange if path conditions are met.

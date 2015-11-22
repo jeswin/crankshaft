@@ -26,21 +26,21 @@ export default class JobQueue {
 
 
     job(fn: () => Promise, name: string, deps: Array<string>) : Job {
-        const _job = new Job(fn, name, deps, this);
+        const _job = new Job(fn, this, name, deps);
         this.jobs.push(_job);
         return _job;
     }
 
 
     onStart(fn: () => Promise, name: string, deps: Array<string>) : Job {
-        const job = new Job(fn, name, deps, this);
+        const job = new Job(fn, this, name, deps);
         this.onStartJobs.push(job);
         return job;
     }
 
 
     onComplete(fn: () => Promise, name: string, deps: Array<string>) : Job {
-        const job = new Job(fn, name, deps, this);
+        const job = new Job(fn, this, name, deps);
         this.onCompleteJobs.push(job);
         return job;
     }
@@ -91,13 +91,13 @@ export default class JobQueue {
         this.queuedJobs = [];
 
         const startRunner = new JobRunner(this);
-        await startRunner.run(this.onStartJobs);
+        await startRunner.runMany(this.onStartJobs);
 
         const jobRunner = new JobRunner(this);
-        await jobRunner.run(this.activeJobs);
+        await jobRunner.runMany(this.activeJobs);
 
         const completionRunner = new JobRunner(this);
-        await completionRunner.run(this.onCompleteJobs);
+        await completionRunner.runMany(this.onCompleteJobs);
 
         await this.runQueuedJobs();
     }

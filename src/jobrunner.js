@@ -22,7 +22,11 @@ export default class JobRunner {
         Runs a list of jobs.
         Dependent jobs must be in the list, or must be in queue.jobs.
     */
-    async run(jobs: Array<Job>) : Promise {
+    async run(job: Job) : Promise {
+        await this.runMany([job]);
+    }
+
+    async runMany(jobs: Array<Job>) : Promise {
         if (!(jobs instanceof Array)) {
             jobs = [jobs];
         }

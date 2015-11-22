@@ -5,7 +5,9 @@ import Watch from './watch';
 import Job from "./job";
 import Build from "./build";
 import JobQueue from './jobqueue';
-import { ensureLeadingSlash, ensureTrailingSlash, resolveDirPath } from "./filepath-utils";
+import WatchPattern from "./watch-pattern";
+
+type OnFileChangeDelegate = (ev: string, watch: Watch, job: Job, config: Configuration) => void;
 
 export default class Configuration extends JobQueue {
 
@@ -18,9 +20,8 @@ export default class Configuration extends JobQueue {
     }
 
 
-    watch(strPatterns: Array<string>, fn: () => Promise, name: string, deps: Array<string>) {
+    watch(strPatterns: Array<string>, fn: () => Promise, name: string, deps: Array<string>) : Job {
         const patterns = strPatterns.map((pattern) => {
-            let result: PatternType;
             /*
                 Exclamation mark at he beginning is a special character.
                 1. "!!!hello" includes a file or directory named "!hello"
@@ -29,90 +30,44 @@ export default class Configuration extends JobQueue {
             */
             if (/^!!!/.test(pattern)) {
                 const _pattern = pattern.substr(2);
-                result.file = path.basename(_pattern);
-                result.dir = path.dirname(_pattern);
+                const file = path.basename(_pattern);
+                const dir = path.dirname(_pattern);
+                return new WatchPattern(file, dir);
             } else if (/^!!/.test(pattern)) {
                 const _pattern = pattern.substr(2);
-                result.file = path.basename(_pattern);
-                result.dir = path.dirname(_pattern);
-                result.important = true;
+                const file = path.basename(_pattern);
+                const dir = path.dirname(_pattern);
+                const important = true;
+                return new WatchPattern(file, dir, "", true, true);
             } else if (/^!/.test(pattern)) {
                 const _pattern = pattern.substr(1);
                 if (/\/$/.test(_pattern)) {
-                    result.exclude = "dir";
-                    result.dir = _pattern;
+                    return new WatchPattern("", _pattern, "dir");
                 } else {
-                    result.exclude = "file";
-                    result.file = path.basename(pattern);
-                    result.dir = path.dirname(pattern);
+                    const file = path.basename(pattern);
+                    const dir = path.dirname(pattern);
+                    return new WatchPattern(file, dir, "file");
                 }
             } else {
-                result.file = path.basename(pattern);
-                result.dir = path.dirname(pattern);
+                const file = path.basename(pattern);
+                const dir = path.dirname(pattern);
+                return new WatchPattern(file, dir);
             }
-            if (typeof result.important === "undefined" || result.important === null)
-                result.important = false;
-
-            return result;
         });
 
-        const job = new Watch(patterns, fn, name, deps, this);
+        return this.watchPatterns(patterns, fn, name, deps);
+    }
+
+
+    watchPatterns(patterns: Array<WatchPattern>, fn: () => Promise, name: string, deps: Array<string>) : Job {
+        const job = new Watch(patterns, fn, this, name, deps);
         this.activeJobs.push(job);
         this.watchJobs.push(job);
         return job;
     }
 
 
-    watchPatterns(patterns: Array<PatternType>, fn: () => Promise, name: string, deps: Array<string>) {
-        patterns.forEach((pattern) => {
-            if (pattern.regex && typeof pattern.regex === "string") {
-                pattern.regex = new RegExp(pattern.regex);
-            }
-
-            if (pattern.exclude) {
-                switch(pattern.exclude) {
-                    case "dir":
-                        if (typeof pattern.recurse === "undefined" || pattern.recurse === null) {
-                            pattern.recurse = true;
-                        }
-                        if (pattern.recurse) {
-                            if (!pattern.regex) {
-                                pattern.regex = new RegExp(ensureLeadingSlash(ensureTrailingSlash(pattern.dir)).replace(/\//g, "\\/"));
-                            }
-                        } else {
-                            if (!pattern.regex) {
-                                pattern.regex = new RegExp("^" + resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/"));
-                            }
-                        }
-                        break;
-                    case "file":
-                        if (!pattern.regex) {
-                            const excludeBaseDir = resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/");
-                            pattern.regex = new RegExp(excludeBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
-                        }
-                        break;
-                    default:
-                        throw new Error("Exclude type must be 'dir' or 'file'");
-                }
-            } else {
-                if (!pattern.regex) {
-                    const patternBaseDir = resolveDirPath(parent.root, pattern.dir).replace(/\//g, "\\/");
-                    pattern.regex = new RegExp(patternBaseDir + "(.*\\/)?" + (pattern.file.replace(".", "\\.").replace("*", ".*") + "$"));
-                }
-                if (typeof pattern.recurse === "undefined" || pattern.recurse === null) {
-                    pattern.recurse = true;
-                }
-            }
-        });
-
-        const job = new Watch(patterns, fn, name, deps, this, {});
-        this.activeJobs.push(job);
-        this.watchJobs.push(job);
-        return job;
-    }
-
-
-    startMonitoring(onFileChange: FnOnFileChangeType) {
+    startMonitoring(onFileChange: OnFileChangeDelegate) : void {
         const self = this;
         this.watchJobs.forEach(function(job) {
             job.startMonitoring(onFileChange);

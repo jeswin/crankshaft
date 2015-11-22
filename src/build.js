@@ -47,7 +47,7 @@ export default class Build extends JobQueue {
                     await config.runJobs();
                     process.chdir(self.root);
                 }
-            })
+            }, self)
         );
 
         await this.runJobs();
