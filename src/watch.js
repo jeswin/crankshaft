@@ -77,8 +77,8 @@ export default class Watch extends JobBase<IConfiguration> {
         this.fn = fn;
 
         this.patterns = patterns;
-        this.excludedPatterns = [];
-        this.excludedDirectories = [];
+        this.excludedPatterns = patterns.filter(p => p.exclude === "file");
+        this.excludedDirectories = patterns.filter(p => p.exclude === "dir");
 
         this.watchedDirs = [];
         this.watchedFiles = [];
@@ -95,8 +95,8 @@ export default class Watch extends JobBase<IConfiguration> {
 
         const walk = async function(dir, recurse, pattern, excludedDirs) {
             let results = [{ path: dir, type: 'dir' }];
-
             let dirEntries;
+
             if (!directoryCache[dir]) {
                 dirEntries = [];
                 try {
@@ -204,8 +204,7 @@ export default class Watch extends JobBase<IConfiguration> {
                 (
                     pattern.important ||
                     !self.excludedPatterns.some(function(excludedPattern) {
-                        return excludedPattern.regex.test(resolvedPath) &&
-                            (!excludedPattern.dir || (excludedPattern.dir.length >= pattern.dir.length));
+                        return excludedPattern.regex.test(resolvedPath) && excludedPattern.dir.length >= pattern.dir.length;
                     })
                 )
             ) {

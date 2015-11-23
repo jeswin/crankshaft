@@ -37,10 +37,6 @@ export default class JobRunner {
     }
 
     async runMany(jobs: Array<JobBase>) : Promise {
-        if (!(jobs instanceof Array)) {
-            jobs = [jobs];
-        }
-
         const self = this;
         const jobList: JobListType = [];
 
@@ -52,7 +48,7 @@ export default class JobRunner {
         // Checks if all dependent jobs have completed.
         const canSignal = function(jobData) {
             //Already done or is it in the process of starting?
-            if ((jobData.tasks && jobData.tasks.length === 0) || jobData.isStarting)
+            if ((jobData.initialized && jobData.tasks.length === 0) || jobData.isStarting)
                 return false;
 
             //Not done yet.

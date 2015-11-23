@@ -10,7 +10,7 @@ export default class WatchPattern {
     exclude: string;
     recurse: boolean;
 
-    constructor(file: string, dir: string, root: string, exclude: string = "file", recurse: boolean = true, important: boolean = false) {
+    constructor(file: string, dir: string, root: string, exclude: string = "", recurse: boolean = true, important: boolean = false) {
         this.file = file;
         this.dir = dir;
         this.important = important;

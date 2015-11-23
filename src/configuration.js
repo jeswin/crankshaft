@@ -33,7 +33,7 @@ export default class Configuration extends JobQueue {
     watch(strPatterns: Array<string>, fn: () => Promise, name: string, deps: Array<string>) : JobBase {
         const patterns = strPatterns.map((pattern) => {
             /*
-                Exclamation mark at he beginning is a special character.
+                Exclamation mark at the beginning is a special character.
                 1. "!!!hello" includes a file or directory named "!hello"
                 2. "!!*.js" marks *.js as an important include. (overrides excludes)
                 3. "!*.txt" means the watch should exclude all txt files.
@@ -47,15 +47,14 @@ export default class Configuration extends JobQueue {
                 const _pattern = pattern.substr(2);
                 const file = path.basename(_pattern);
                 const dir = path.dirname(_pattern);
-                const important = true;
                 return new WatchPattern(file, dir, this.root, "", true, true);
             } else if (/^!/.test(pattern)) {
                 const _pattern = pattern.substr(1);
                 if (/\/$/.test(_pattern)) {
                     return new WatchPattern("", _pattern, this.root, "dir");
                 } else {
-                    const file = path.basename(pattern);
-                    const dir = path.dirname(pattern);
+                    const file = path.basename(_pattern);
+                    const dir = path.dirname(_pattern);
                     return new WatchPattern(file, dir, this.root, "file");
                 }
             } else {
