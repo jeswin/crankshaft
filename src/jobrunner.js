@@ -1,12 +1,12 @@
 /* @flow */
-import Job from './job';
+import JobBase from './job-base';
 
 type IJobQueue = {
-    jobs: Array<Job>
+    jobs: Array<JobBase>
 };
 
 type JobListEntryType = {
-    job: Job,
+    job: JobBase,
     tasks: Array<() => Promise>,
     initialized: boolean,
     completedTasks: number,
@@ -32,11 +32,11 @@ export default class JobRunner {
         Runs a list of jobs.
         Dependent jobs must be in the list, or must be in queue.jobs.
     */
-    async run(job: Job) : Promise {
+    async run(job: JobBase) : Promise {
         await this.runMany([job]);
     }
 
-    async runMany(jobs: Array<Job>) : Promise {
+    async runMany(jobs: Array<JobBase>) : Promise {
         if (!(jobs instanceof Array)) {
             jobs = [jobs];
         }
@@ -122,7 +122,7 @@ export default class JobRunner {
             activeThreads--;
         };
 
-        const addToJobList = function(job: Job, jobList: JobListType) {
+        const addToJobList = function(job: JobBase, jobList: JobListType) {
             //See if the job is already in the jobList
             const isInList = jobList.some(function(item) {
                 return item.job.name === job.name;

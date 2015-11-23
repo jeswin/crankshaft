@@ -29,7 +29,8 @@ export default class Build extends JobQueue {
     configure(fn: ConfigureDelegate, root: string) : Configuration {
         const configuration = new Configuration(root, this);
         this.configs.push(configuration);
-        return fn(configuration);
+        fn(configuration);
+        return configuration;
     }
 
 

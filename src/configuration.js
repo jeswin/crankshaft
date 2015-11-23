@@ -1,8 +1,8 @@
 /* @flow */
 import fs from 'fs';
 import path from 'path';
+import JobBase from "./job-base";
 import Watch from './watch';
-import Job from "./job";
 import JobQueue from './jobqueue';
 import WatchPattern from "./watch-pattern";
 
@@ -10,7 +10,7 @@ type IConfiguration = {
     root: string
 };
 
-type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Job, config: IConfiguration) => void;
+type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Watch, config: IConfiguration) => void;
 
 type WatchedFilesEntryType = {
     path: string,
@@ -30,7 +30,7 @@ export default class Configuration extends JobQueue {
     }
 
 
-    watch(strPatterns: Array<string>, fn: () => Promise, name: string, deps: Array<string>) : Job {
+    watch(strPatterns: Array<string>, fn: () => Promise, name: string, deps: Array<string>) : JobBase {
         const patterns = strPatterns.map((pattern) => {
             /*
                 Exclamation mark at he beginning is a special character.
@@ -42,26 +42,26 @@ export default class Configuration extends JobQueue {
                 const _pattern = pattern.substr(2);
                 const file = path.basename(_pattern);
                 const dir = path.dirname(_pattern);
-                return new WatchPattern(file, dir);
+                return new WatchPattern(file, dir, this.root);
             } else if (/^!!/.test(pattern)) {
                 const _pattern = pattern.substr(2);
                 const file = path.basename(_pattern);
                 const dir = path.dirname(_pattern);
                 const important = true;
-                return new WatchPattern(file, dir, "", true, true);
+                return new WatchPattern(file, dir, this.root, "", true, true);
             } else if (/^!/.test(pattern)) {
                 const _pattern = pattern.substr(1);
                 if (/\/$/.test(_pattern)) {
-                    return new WatchPattern("", _pattern, "dir");
+                    return new WatchPattern("", _pattern, this.root, "dir");
                 } else {
                     const file = path.basename(pattern);
                     const dir = path.dirname(pattern);
-                    return new WatchPattern(file, dir, "file");
+                    return new WatchPattern(file, dir, this.root, "file");
                 }
             } else {
                 const file = path.basename(pattern);
                 const dir = path.dirname(pattern);
-                return new WatchPattern(file, dir);
+                return new WatchPattern(file, dir, this.root);
             }
         });
 
@@ -69,7 +69,7 @@ export default class Configuration extends JobQueue {
     }
 
 
-    watchPatterns(patterns: Array<WatchPattern>, fn: () => Promise, name: string, deps: Array<string>) : Job {
+    watchPatterns(patterns: Array<WatchPattern>, fn: () => Promise, name: string, deps: Array<string>) : JobBase {
         const job = new Watch(patterns, fn, this, name, deps);
         this.activeJobs.push(job);
         this.watchJobs.push(job);

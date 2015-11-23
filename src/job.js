@@ -1,32 +1,13 @@
 /* @flow */
+import JobBase from './job-base';
 
-export default class Job<TParent> {
+export default class Job<TParent> extends JobBase<TParent> {
 
     fn: () => Promise;
-    name: string;
-    deps: Array<string>;
-    parent: TParent;
 
     constructor(fn: () => Promise, parent: TParent, name: string = "", deps: Array<string> = []) {
+        super(parent, name, deps);
         this.fn = fn;
-        this.name = name || this.randomString(24);
-
-        this.deps = deps || [];
-        if (typeof deps === "string")
-            this.deps = [deps];
-
-        this.parent = parent;
-    }
-
-
-    randomString(len: number) : string {
-        var text = "";
-        var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-        for( var i = 0; i < len; i++ ) {
-            text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
     }
 
 

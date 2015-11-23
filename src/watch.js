@@ -3,14 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import promisify from 'nodefunc-promisify';
 import { ensureLeadingSlash, ensureTrailingSlash, resolveDirPath } from "./filepath-utils";
-import Job from './job';
+import JobBase from './job-base';
 import WatchPattern from "./watch-pattern";
 
 type IConfiguration = {
     root: string
 };
 
-type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Job, config: IConfiguration) => void;
+type OnFileChangeDelegate = (ev: string, watch: WatchedFilesEntryType, job: Watch, config: IConfiguration) => void;
 
 type WatchedFilesEntryType = {
     path: string,
@@ -58,8 +58,9 @@ const getExcludeDirectoryPredicate = function(dir, root, pattern) {
 };
 
 
-export default class Watch extends Job<IConfiguration> {
+export default class Watch extends JobBase<IConfiguration> {
 
+    fn: (filePath: string, changeType: string, patterns: Array<WatchPattern>) => Promise;
     path: string;
     fileWatcher: Object;
     patterns: Array<Object>;
@@ -70,8 +71,10 @@ export default class Watch extends Job<IConfiguration> {
     excludedDirectories: Array<WatchPattern>;
 
 
-    constructor(patterns: Array<WatchPattern>, fn: () => Promise, parent: IConfiguration, name: string, deps: Array<string>) {
-        super(fn, parent, name, deps);
+    constructor(patterns: Array<WatchPattern>, fn: (filePath: string, changeType: string, patterns: Array<WatchPattern>) => Promise, parent: IConfiguration, name: string, deps: Array<string>) {
+        super(parent, name, deps);
+
+        this.fn = fn;
 
         this.patterns = patterns;
         this.excludedPatterns = [];
@@ -82,7 +85,6 @@ export default class Watch extends Job<IConfiguration> {
 
         //This is an index with key as the watched file path and value as match information (watcher, patterns ..)
         this.watchIndex = {};
-
     }
 
 

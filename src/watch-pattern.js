@@ -10,7 +10,7 @@ export default class WatchPattern {
     exclude: string;
     recurse: boolean;
 
-    constructor(file: string, dir: string, exclude: string = "file", recurse: boolean = true, important: boolean = false) {
+    constructor(file: string, dir: string, root: string, exclude: string = "file", recurse: boolean = true, important: boolean = false) {
         this.file = file;
         this.dir = dir;
         this.important = important;
@@ -26,13 +26,13 @@ export default class WatchPattern {
                         }
                     } else {
                         if (!this.regex) {
-                            this.regex = new RegExp("^" + resolveDirPath(parent.root, this.dir).replace(/\//g, "\\/"));
+                            this.regex = new RegExp("^" + resolveDirPath(root, this.dir).replace(/\//g, "\\/"));
                         }
                     }
                     break;
                 case "file":
                     if (!this.regex) {
-                        const excludeBaseDir = resolveDirPath(parent.root, this.dir).replace(/\//g, "\\/");
+                        const excludeBaseDir = resolveDirPath(root, this.dir).replace(/\//g, "\\/");
                         this.regex = new RegExp(excludeBaseDir + "(.*\\/)?" + (this.file.replace(".", "\\.").replace("*", ".*") + "$"));
                     }
                     break;
@@ -41,7 +41,7 @@ export default class WatchPattern {
             }
         } else {
             if (!this.regex) {
-                const patternBaseDir = resolveDirPath(parent.root, this.dir).replace(/\//g, "\\/");
+                const patternBaseDir = resolveDirPath(root, this.dir).replace(/\//g, "\\/");
                 this.regex = new RegExp(patternBaseDir + "(.*\\/)?" + (this.file.replace(".", "\\.").replace("*", ".*") + "$"));
             }
         }

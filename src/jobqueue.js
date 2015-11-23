@@ -1,4 +1,5 @@
 /* @flow */
+import JobBase from './job-base';
 import Job from './job';
 import JobRunner from './jobrunner';
 import Build from "./build";
@@ -7,11 +8,11 @@ import Build from "./build";
 export default class JobQueue {
 
     root: string;
-    activeJobs: Array<Job>;
-    jobs: Array<Job>;
-    onStartJobs: Array<Job>;
-    onCompleteJobs: Array<Job>;
-    queuedJobs: Array<Job>;
+    activeJobs: Array<JobBase>;
+    jobs: Array<JobBase>;
+    onStartJobs: Array<JobBase>;
+    onCompleteJobs: Array<JobBase>;
+    queuedJobs: Array<JobBase>;
     threads: number;
 
     constructor(root: string) {
