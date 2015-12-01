@@ -1,3 +1,3 @@
 declare module "nodefunc-promisify" {
-    declare function exports<T>(nodefunc: (arg: any, callback: (e: ?Error, result: T) => void) => void) : (arg: any) => Promise<T>;
+    declare function exports(nodefunc: Function) : (...params: any) => Promise;
 }
