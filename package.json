@@ -4,7 +4,7 @@
         "email": "jeswinpk@agilehead.com"
     },
     "name": "crankshaft",
-    "version": "5.0.0",
+    "version": "5.0.1",
     "description": "Build System.",
     "scripts": {
         "test": "mocha dist/test/test.js"
