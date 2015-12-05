@@ -1,9 +1,7 @@
 [include]
-src/
 
 [libs]
-type-definitions/crankshaft.js
-type-definitions/nodefunc-promisify.js
+interfaces/
 
 [options]
 
