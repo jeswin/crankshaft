@@ -20,6 +20,8 @@ const exec = promisify(function(cmd, cb) {
     });
 });
 
+process.chdir(__dirname);
+
 /*
     A helper function to create directories which may not exist.
     We are going to use this in tasks below.
