@@ -7,7 +7,7 @@ import promisify from 'nodefunc-promisify';
 import path from 'path';
 import childProcess from 'child_process';
 import should from 'should';
-import crankshaft from "../crankshaft";
+import crankshaft from "../";
 import touch from "touch";
 import fs from "fs-extra";
 
@@ -280,6 +280,6 @@ describe("Crankshaft build", () => {
       }, "copy_files");
     }
     const config = build.configure(createConfig, 'fixtures');
-    return crankshaft.run(build, true);
+    crankshaft.run(build, true);
   });
 });

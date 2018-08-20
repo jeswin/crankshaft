@@ -13,7 +13,7 @@
     "type": "git",
     "url": "https://github.com/jeswin/crankshaft.git"
   },
-  "main": "dist/crankshaft",
+  "main": "dist/index.js",
   "dependencies": {
     "babel-runtime": "*",
     "nodefunc-promisify": "*"
